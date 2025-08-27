@@ -1,0 +1,16 @@
+package com.itt.service.dto.peta_petd;
+
+import java.util.List;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PetaPetdBulkUpdateRequest {
+	private List<Integer> companyCodes;
+	private Boolean petaCalling;
+	private Boolean isAllSelected;
+}

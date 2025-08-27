@@ -1,0 +1,57 @@
+# Production Environment Configuration
+# 
+# This configuration is optimized for production workloads with:
+# - Minimal logging (WARN level) for performance
+# - No DDL auto-generation for database safety
+# - Production database connection settings
+# - Feature toggles disabled by default for stability
+
+spring:
+  profiles: prod
+  datasource:
+    url: jdbc:mysql://prod-host:3306/prod_db
+    username: prod_user
+    password: prod_pass
+  jpa:
+    hibernate:
+      ddl-auto: none  # Never auto-generate schema in production
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+        generate_statistics: false
+        # Simple batch optimization for production
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+        order_updates: true
+
+# Server Configuration - Production
+server:
+  port: 8080
+
+# External API Rate Limiting Configuration - Production Environment
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 5000
+      requests-per-minute: 500
+      burst-capacity: 50
+
+# API Documentation Configuration - Production Environment
+# Note: Consider disabling Swagger in production for security
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs          # OpenAPI JSON endpoint
+    enabled: false                              # SECURITY: Disable in production
+  swagger-ui:
+    path: /api/docs/swagger-ui.html   # Swagger UI interface
+    enabled: false                              # SECURITY: Disable in production
+
+# Swagger Server URLs - Production Environment
+swagger:
+  servers:
+    urls:
+      - "https://api.itt.com"             # TODO: Replace with actual production API URL
+      - "https://portal.itt.com"          # TODO: Replace with actual production portal URL

@@ -1,0 +1,69 @@
+# Staging Environment Configuration
+#
+# This configuration mirrors production as closely as possible while providing
+# additional logging and validation for pre-production testing:
+# - Schema validation to ensure database compatibility
+# - INFO level logging for better visibility during testing
+# - Production-like database configuration
+# - Feature toggles available for testing scenarios
+
+spring:
+  profiles: stage
+  
+  # Database Configuration
+  # Uses direct JDBC connection (similar to production)
+  datasource:
+    url: jdbc:mysql://staging-host:3306/stage_db
+    username: stage_user
+    password: stage_pass
+    
+  # JPA Configuration
+  # Validates schema without making changes - ensures production compatibility
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Validates schema matches entities without changes
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+        generate_statistics: false
+        # Simple batch optimization for staging
+        jdbc:
+          batch_size: 75
+        order_inserts: true
+        order_updates: true
+
+# Server Configuration - Staging
+server:
+  port: 8080
+
+# External API Rate Limiting Configuration - Staging Environment
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 2000
+      requests-per-minute: 200
+      burst-capacity: 20
+
+# API Documentation Configuration - Staging Environment
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs          # OpenAPI JSON endpoint
+    enabled: true                               # Enable OpenAPI documentation
+  swagger-ui:
+    path: /api/docs/swagger-ui.html   # Swagger UI interface
+    disable-swagger-default-url: true           # Use custom URL configuration
+    url: /api/docs/api-docs           # Points to our OpenAPI JSON
+    config-url: /api/docs/api-docs/swagger-config  # Swagger config endpoint
+    enabled: true                               # Enable Swagger UI
+  paths-to-match: /**                          # Include all paths in documentation
+  packages-to-scan: com.itt.service  # Scan only our packages
+
+# Swagger Server URLs - Staging Environment
+swagger:
+  servers:
+    urls:
+      - "https://stage-api.itt.com"       # TODO: Replace with actual staging server URL
+      - "https://staging.itt.com"         # TODO: Replace with actual staging portal URL
+

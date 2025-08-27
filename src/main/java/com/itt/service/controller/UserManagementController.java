@@ -1,0 +1,160 @@
+package com.itt.service.controller;
+
+import java.util.List;
+import java.util.Map;
+
+import com.itt.service.dto.PaginationResponse;
+import com.itt.service.dto.user_management.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.itt.service.dto.ApiResponse;
+import com.itt.service.dto.CurrentUserDto;
+import com.itt.service.service.UserManagementService;
+import com.itt.service.util.ResponseBuilder;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+
+@Tag(name = "User Management", description = "APIs for managing users, roles, and companies")
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/user-management")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
+public class UserManagementController {
+
+        private final UserManagementService userManagementService;
+
+        @Operation(summary = "List and search users", description = "Returns paginated list of users. Supports filters, sorting, and active role switch. If no search criteria provided, returns all users.")
+        @PostMapping("/users")
+        public ResponseEntity<ApiResponse<PaginationResponse<SearchUsersResponseDto>>> getUsers(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Search user request", required = true) @org.springframework.web.bind.annotation.RequestBody SearchUsersRequestDto request) {
+                PaginationResponse<SearchUsersResponseDto> result = userManagementService.getUsers(currentUser,
+                                request);
+                return ResponseBuilder.dynamicResponse(result);
+        }
+
+        @Operation(summary = "Get user count by role activity")
+        @GetMapping("/user-count")
+        public ResponseEntity<ApiResponse<UserCountResponseDto>> getUserCount(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestParam String type) {
+                UserCountResponseDto count = userManagementService.getUserCount(currentUser, type);
+                return ResponseBuilder.success(count);
+        }
+
+        @Operation(summary = "Get all active or inactive roles")
+        @GetMapping("/active-roles")
+        public ResponseEntity<ApiResponse<List<RoleDto>>> getActiveRoles(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestParam boolean active) {
+                List<RoleDto> roles = userManagementService.getActiveRoles(currentUser, active);
+                return ResponseBuilder.success(roles);
+        }
+
+        @Operation(summary = "List and search companies", description = "Returns companies with PSA/BDP toggle. If no search criteria provided, returns all companies.")
+        @PostMapping("/companies")
+        public ResponseEntity<ApiResponse<List<CompanyTreeNode>>> searchCompanies(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Company search filter", required = true) @org.springframework.web.bind.annotation.RequestBody SearchCompanyRequestDto request) {
+                List<CompanyTreeNode> companies = userManagementService.searchCompanies(currentUser, request);
+                return ResponseBuilder.success(companies);
+        }
+
+        @Operation(summary = "Update user role and company assignments")
+        @PutMapping("/user-assignments")
+        public ResponseEntity<ApiResponse<Void>> updateUserAssignments(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @Parameter(description = "User ID") @RequestParam String userId,
+                        @RequestBody(description = "Access assignment payload", required = true) @org.springframework.web.bind.annotation.RequestBody AccessAssignmentRequestDto request) {
+                String message = userManagementService.updateUserAccessAssignments(currentUser, userId, request);
+                return ResponseBuilder.success(message);
+        }
+
+        @Operation(summary = "Search user for copy access")
+        @PostMapping("/search-for-copy")
+        public ResponseEntity<ApiResponse<List<SearchUsersResponseDto>>> searchUserForCopy(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Search for copy target", required = true) @org.springframework.web.bind.annotation.RequestBody SearchForCopyRequestDto request) {
+                List<SearchUsersResponseDto> users = userManagementService.searchUserForCopy(currentUser, request);
+                return ResponseBuilder.success(users);
+        }
+
+        @Operation(summary = "Copy access from one user to another")
+        @PostMapping("/copy-access")
+        public ResponseEntity<ApiResponse<Void>> copyUserAccess(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Copy access request", required = true) @org.springframework.web.bind.annotation.RequestBody CopyAccessRequestDto request) {
+                String message = userManagementService.copyUserAccess(currentUser, request);
+                return ResponseBuilder.success(message);
+        }
+
+        @Operation(summary = "Load top-level companies")
+        @PostMapping("/top-level-companies")
+        public ResponseEntity<ApiResponse<List<CompanyDto>>> getTopLevelCompanies(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Top level companies request", required = true) @org.springframework.web.bind.annotation.RequestBody TopLevelCompaniesRequestDto request) {
+                List<CompanyDto> companies = userManagementService.getTopLevelCompanies(currentUser, request);
+                return ResponseBuilder.success(companies);
+        }
+
+        @Operation(summary = "Load child companies by parent IDs")
+        @PostMapping("/child-companies")
+        public ResponseEntity<ApiResponse<Map<String, List<CompanyDto>>>> getChildCompanies(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @RequestBody(description = "Parent companies payload", required = true) @org.springframework.web.bind.annotation.RequestBody ChildCompaniesRequestDto request) {
+                Map<String, List<CompanyDto>> children = userManagementService.getChildCompanies(currentUser, request);
+                return ResponseBuilder.success(children);
+        }
+
+        @Operation(summary = "Get companies assigned to a user")
+        @GetMapping("/user-assigned-companies")
+        public ResponseEntity<ApiResponse<List<AssignedCompanyDto>>> getUserAssignedCompanies(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @Parameter(description = "User ID") @RequestParam String userId) {
+                List<AssignedCompanyDto> assigned = userManagementService.getAssignedCompanies(currentUser, userId);
+                return ResponseBuilder.success(assigned);
+        }
+
+        @Operation(summary = "Get user access summary for copy preview")
+        @GetMapping("/user-access-summary")
+        public ResponseEntity<ApiResponse<AccessSummaryResponseDto>> getUserAccessSummary(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @Parameter(description = "User ID") @RequestParam String userId) {
+                AccessSummaryResponseDto summary = userManagementService.getAccessSummary(currentUser, userId);
+                return ResponseBuilder.success(summary);
+        }
+
+        @Operation(summary = "Get company tree structure", description = "Returns the full company hierarchy, paginated.  "
+                        + "Pass `type=PSA`, `NON-PSA`.")
+        @PostMapping("/company-tree")
+        public ResponseEntity<ApiResponse<CompanyTreeResponseDto>> getCompanyTree(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+
+                        @RequestBody(description = "Pagination + type filter", required = true) @org.springframework.web.bind.annotation.RequestBody CompanyTreeRequestDto request) {
+                CompanyTreeResponseDto result = userManagementService.buildCompanyTree(request);
+                return ResponseBuilder.success(result);
+        }
+
+        @Operation(summary = "List and search user companies", description = "Returns paginated list of companies assigned to a user. Supports search functionality. If no search criteria provided, returns all user companies. Fixed page size of 500.")
+        @PostMapping("/user-companies")
+        public ResponseEntity<ApiResponse<PaginationResponse<UserCompanyDto>>> searchUserCompanies(
+                        @Parameter(hidden = true) @RequestAttribute(value = "currentUser", required = false) CurrentUserDto currentUser,
+                        @Parameter(description = "User ID") @RequestParam Integer userId,
+                        @RequestBody(description = "Search request with pagination", required = true) @org.springframework.web.bind.annotation.RequestBody SearchUsersRequestDto request) {
+                PaginationResponse<UserCompanyDto> result = userManagementService.getUserCompanies(currentUser, userId,
+                                request);
+                return ResponseBuilder.dynamicResponse(result);
+        }
+}

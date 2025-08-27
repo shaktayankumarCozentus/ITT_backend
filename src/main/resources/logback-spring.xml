@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="LOG_PATH" source="logging.path" defaultValue="logs"/>
+    <springProperty scope="context" name="LOG_FILE_NAME" source="logging.file.name" defaultValue="application.log"/>
+    <springProperty scope="context" name="LOG_LEVEL_ROOT" source="logging.level.root" defaultValue="INFO"/>
+    <springProperty scope="context" name="MAX_HISTORY" source="logging.file.max-history" defaultValue="30"/>
+
+    <property name="APP_LOG" value="${LOG_PATH}/${LOG_FILE_NAME}" />
+    <property name="ERROR_LOG" value="${LOG_PATH}/error.log" />
+
+    <appender name="CONSOLE_FRAMEWORK" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${APP_LOG}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${MAX_HISTORY}</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${ERROR_LOG}</file>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/error.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${MAX_HISTORY}</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Disable Hibernate Session Metrics Logging -->
+    <logger name="org.hibernate.engine.internal.StatisticalLoggingSessionEventListener" level="OFF" additivity="false" />
+    
+    <!-- Suppress other verbose Hibernate logging -->
+    <logger name="org.hibernate.type.BasicTypeRegistry" level="WARN" additivity="false" />
+    <logger name="org.hibernate.type" level="WARN" additivity="false" />
+    <logger name="org.hibernate.engine.jdbc.batch.internal.BatchingBatch" level="WARN" additivity="false" />
+    
+    <!-- Suppress HikariCP connection pool verbose logging -->
+    <logger name="com.zaxxer.hikari" level="WARN" additivity="false" />
+
+    <root level="${LOG_LEVEL_ROOT}">
+        <appender-ref ref="CONSOLE_FRAMEWORK" />
+        <appender-ref ref="APP_FILE" />
+        <appender-ref ref="ERROR_FILE" />
+    </root>
+</configuration>
