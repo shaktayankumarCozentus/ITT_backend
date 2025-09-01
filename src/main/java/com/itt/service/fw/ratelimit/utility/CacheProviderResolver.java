@@ -2,6 +2,8 @@ package com.itt.service.fw.ratelimit.utility;
 
 import com.itt.service.fw.ratelimit.enums.CacheProviderType;
 import org.springframework.stereotype.Component;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 
 import javax.cache.spi.CachingProvider;
 import java.util.Iterator;
@@ -21,6 +23,6 @@ public class CacheProviderResolver {
                 return provider;
             }
         }
-        throw new IllegalStateException("No CachingProvider found for: " + providerType);
+        throw new CustomException(ErrorCode.EXTERNAL_SERVICE_UNAVAILABLE, "No CachingProvider found for: " + providerType);
     }
 }

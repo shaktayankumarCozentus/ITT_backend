@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import com.itt.service.dto.ApiResponse.ValidationError;
 import com.itt.service.dto.DataTableRequest;
 import com.itt.service.exception.ValidationException;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.fw.search.SearchableEntity;
 
 import lombok.RequiredArgsConstructor;
@@ -102,14 +104,14 @@ public class DataTableRequestValidator {
      * @param request The DataTableRequest to validate
      * @param entity The SearchableEntity configuration to validate against
      * @throws ValidationException if any validation failures are detected
-     * @throws IllegalArgumentException if request or entity is null
+     * @throws CustomException if request or entity is null
      */
     public <T> void validateRequest(DataTableRequest request, SearchableEntity<T> entity) {
         if (request == null) {
-            throw new IllegalArgumentException("DataTableRequest cannot be null");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "DataTableRequest cannot be null");
         }
         if (entity == null) {
-            throw new IllegalArgumentException("SearchableEntity cannot be null");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "SearchableEntity cannot be null");
         }
 
         List<ValidationError> errors = new ArrayList<>();

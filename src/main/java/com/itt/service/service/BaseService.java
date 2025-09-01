@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.itt.service.annotation.ReadOnlyDataSource;
 import com.itt.service.dto.DataTableRequest;
 import com.itt.service.dto.PaginationResponse;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.fw.search.DynamicSearchQueryBuilder;
 import com.itt.service.fw.search.SearchableEntity;
 import com.itt.service.fw.search.UniversalSortFieldValidator;
@@ -193,7 +195,7 @@ public abstract class BaseService<T, ID, DTO> {
             return searchWithFramework(request, searchableEntity);
         } else {
             // Framework not enabled - require SearchableEntity implementation
-            throw new IllegalStateException(
+            throw new CustomException(ErrorCode.INVALID_DATA_FORMAT,
                 "Universal Search Framework not enabled. Override getSearchableEntity() method in " + 
                 this.getClass().getSimpleName() + " to provide SearchableEntity configuration."
             );
@@ -206,7 +208,7 @@ public abstract class BaseService<T, ID, DTO> {
     private PaginationResponse<DTO> searchWithFramework(DataTableRequest request, SearchableEntity<T> searchableEntity) {
         // SECURITY: Validate request fields before processing
         if (request == null) {
-            throw new IllegalArgumentException("DataTableRequest cannot be null");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "DataTableRequest cannot be null");
         }
         
         // Register entity for sort validation

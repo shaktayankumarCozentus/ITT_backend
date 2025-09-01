@@ -10,6 +10,8 @@ import com.itt.service.fw.logger.storage.impl.FileLogPersistenceService;
 import com.itt.service.fw.logger.storage.impl.FileLoggingService;
 import com.itt.service.fw.logger.storage.persistence.LogPersistenceService;
 import com.itt.service.repository.LogRepository;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -58,7 +60,7 @@ public class LoggerAutoConfiguration {
                 yield fileLogger;
             }
             default ->
-                    throw new IllegalArgumentException("❌ Logger mode is missing or unsupported. Please set 'logging.mode' to either 'db' or 'file'. Found: " + props.getMode());
+                    throw new CustomException(ErrorCode.INVALID_DATA_FORMAT, "❌ Logger mode is missing or unsupported. Please set 'logging.mode' to either 'db' or 'file'. Found: " + props.getMode());
         };
     }
 
@@ -78,7 +80,7 @@ public class LoggerAutoConfiguration {
                 log.info("Getting File logger service");
                 yield new FileLoggingService(logRepository);
             }
-            default -> throw new IllegalArgumentException(
+            default -> throw new CustomException(ErrorCode.INVALID_DATA_FORMAT,
                     "❌ Logger mode is missing or unsupported. Please set 'logging.mode' to either 'db' or 'file'. Found: " + props.getMode()
             );
         };

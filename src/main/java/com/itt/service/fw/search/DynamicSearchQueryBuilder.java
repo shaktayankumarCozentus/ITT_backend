@@ -1,6 +1,8 @@
 package com.itt.service.fw.search;
 
 import com.itt.service.dto.DataTableRequest;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.validator.DataTableRequestValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +123,7 @@ public class DynamicSearchQueryBuilder {
             requestValidator.validateRequest(request, searchableEntity);
             logger.debug("DataTableRequest validation passed for entity {}", searchableEntity.getEntityClass().getSimpleName());
         } else {
-            throw new IllegalArgumentException("DataTableRequest cannot be null");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "DataTableRequest cannot be null");
         }
         
         try {
@@ -167,7 +169,8 @@ public class DynamicSearchQueryBuilder {
         } catch (Exception e) {
             logger.error("Error executing dynamic search for entity {}: {}", 
                         searchableEntity.getEntityClass().getSimpleName(), e.getMessage(), e);
-            throw new RuntimeException("Search execution failed for " + searchableEntity.getEntityClass().getSimpleName(), e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, 
+                    "Search execution failed for " + searchableEntity.getEntityClass().getSimpleName(), e);
         }
     }
 
@@ -264,7 +267,7 @@ public class DynamicSearchQueryBuilder {
                 
                 StringBuilder sortClause = new StringBuilder();
                 if (actualField.contains(".")) {
-                    sortClause.append(actualField);
+                    sortClause.append("e.").append(actualField);
                 } else {
                     sortClause.append("e.").append(actualField);
                 }
@@ -365,7 +368,7 @@ public class DynamicSearchQueryBuilder {
                 
                 StringBuilder sortClause = new StringBuilder();
                 if (actualField.contains(".")) {
-                    sortClause.append(actualField);
+                    sortClause.append("e.").append(actualField);
                 } else {
                     sortClause.append("e.").append(actualField);
                 }
@@ -398,6 +401,15 @@ public class DynamicSearchQueryBuilder {
      */
     private <T> List<String> buildColumnFilterConditions(SearchableEntity<T> entity, DataTableRequest request) {
         List<String> conditions = new ArrayList<>();
+        
+        // DEBUG: Log all columns being processed
+        if (request.getColumns() != null) {
+            logger.debug("Processing {} column filters:", request.getColumns().size());
+            for (int i = 0; i < request.getColumns().size(); i++) {
+                DataTableRequest.Column col = request.getColumns().get(i);
+                logger.debug("  Column {}: name='{}', filter='{}'", i, col.getColumnName(), col.getFilter());
+            }
+        }
         
         if (request.getColumns() == null) {
             return conditions;
@@ -451,7 +463,7 @@ public class DynamicSearchQueryBuilder {
                 }
             }
             
-            String condition = buildFilterCondition(actualField, criteria);
+            String condition = buildFilterCondition(entity, actualField, criteria);
             if (condition != null && !condition.trim().isEmpty()) {
                 conditions.add(condition);
             }
@@ -477,49 +489,79 @@ public class DynamicSearchQueryBuilder {
      * Build individual filter condition based on operator.
      * MODERN JAVA OPTIMIZATION: Uses Java 17+ switch expressions for better performance and readability.
      */
-    private String buildFilterCondition(String field, com.itt.service.specification.FilterParser.FilterCriteria criteria) {
+    private <T> String buildFilterCondition(SearchableEntity<T> entity, String field, com.itt.service.specification.FilterParser.FilterCriteria criteria) {
         String fieldRef = getQualifiedFieldReference(field);
         String operator = criteria.getOperator();
-        String paramName = sanitizeParamName(field);
+        String paramName = "filter_" + sanitizeParamName(field);
+        
+        // DEBUG: Get field type to check for potential LOWER() function mismatches
+        Class<?> fieldType = entity.getFieldType(field);
+        logger.debug("Building filter condition for field '{}' with type '{}' and operator '{}'", 
+                  field, fieldType != null ? fieldType.getSimpleName() : "null", operator);
+        
+        // Check if operator requires string operations but field is not string
+        boolean requiresStringOp = Set.of("cnt", "ncnt", "sw", "ew").contains(operator);
+        if (requiresStringOp && fieldType != null && fieldType != String.class) {
+            logger.warn("WARNING: String operation '{}' applied to non-String field '{}' of type '{}'. This may cause LOWER() function errors.", 
+                     operator, field, fieldType.getSimpleName());
+        }
         
         // JAVA 17+ SWITCH EXPRESSIONS: More efficient than if-else chains
         return switch (operator) {
             case "cnt" -> // Contains
-                "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT('%', :filter_" + paramName + ", '%'))";
+                fieldType == String.class 
+                    ? "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT('%', :" + paramName + ", '%'))"
+                    : fieldRef + " = :" + paramName; // Convert to equality for non-string fields
             case "ncnt" -> // Not contains
-                "LOWER(" + fieldRef + ") NOT LIKE LOWER(CONCAT('%', :filter_" + paramName + ", '%'))";
+                fieldType == String.class 
+                    ? "LOWER(" + fieldRef + ") NOT LIKE LOWER(CONCAT('%', :" + paramName + ", '%'))"
+                    : fieldRef + " != :" + paramName; // Convert to inequality for non-string fields
             case "sw" -> // Starts with
-                "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT(:filter_" + paramName + ", '%'))";
+                fieldType == String.class 
+                    ? "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT(:" + paramName + ", '%'))"
+                    : fieldRef + " = :" + paramName; // Convert to equality for non-string fields
             case "ew" -> // Ends with
-                "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT('%', :filter_" + paramName + "))";
+                fieldType == String.class 
+                    ? "LOWER(" + fieldRef + ") LIKE LOWER(CONCAT('%', :" + paramName + "))"
+                    : fieldRef + " = :" + paramName; // Convert to equality for non-string fields
             case "eq" -> // Equals
-                fieldRef + " = :filter_" + paramName;
+                fieldRef + " = :" + paramName;
             case "ne" -> // Not equals
-                fieldRef + " != :filter_" + paramName;
+                fieldRef + " != :" + paramName;
             case "gt" -> // Greater than
-                fieldRef + " > :filter_" + paramName;
+                fieldRef + " > :" + paramName;
             case "gte" -> // Greater than or equal
-                fieldRef + " >= :filter_" + paramName;
+                fieldRef + " >= :" + paramName;
             case "lt" -> // Less than
-                fieldRef + " < :filter_" + paramName;
+                fieldRef + " < :" + paramName;
             case "lte" -> // Less than or equal
-                fieldRef + " <= :filter_" + paramName;
+                fieldRef + " <= :" + paramName;
             case "dgt" -> // Date greater than (date-only comparison)
-                "DATE(" + fieldRef + ") > DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") > DATE(:" + paramName + ")";
             case "dgte" -> // Date greater than or equal (date-only comparison)
-                "DATE(" + fieldRef + ") >= DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") >= DATE(:" + paramName + ")";
             case "dlt" -> // Date less than (date-only comparison)
-                "DATE(" + fieldRef + ") < DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") < DATE(:" + paramName + ")";
             case "dlte" -> // Date less than or equal (date-only comparison)
-                "DATE(" + fieldRef + ") <= DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") <= DATE(:" + paramName + ")";
             case "deq" -> // Date equals (date-only comparison)
-                "DATE(" + fieldRef + ") = DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") = DATE(:" + paramName + ")";
             case "dne" -> // Date not equals (date-only comparison)
-                "DATE(" + fieldRef + ") != DATE(:filter_" + paramName + ")";
+                "DATE(" + fieldRef + ") != DATE(:" + paramName + ")";
             case "dbetween" -> // Date between (date-only comparison)
-                "DATE(" + fieldRef + ") BETWEEN DATE(:filter_" + paramName + "_start) AND DATE(:filter_" + paramName + "_end)";
+                "DATE(" + fieldRef + ") BETWEEN DATE(:" + paramName + "_start) AND DATE(:" + paramName + "_end)";
             case "in" -> // In list
-                fieldRef + " IN :filter_" + paramName + "_list";
+                fieldRef + " IN :" + paramName + "_list";
+            case "null" -> // Is null
+                fieldRef + " IS NULL";
+            case "notnull" -> // Is not null
+                fieldRef + " IS NOT NULL";
+            case "activeornorole" -> // Special case for users with active role OR no role
+                {
+                    String condition = "(e.assignedRole IS NULL OR e.assignedRole.isActive = 1)";
+                    logger.debug("Generated activeornorole condition: '{}'", condition);
+                    yield condition;
+                }
             default -> {
                 logger.warn("Unknown filter operator: {}", operator);
                 yield null; // Java 17+ yield for switch expressions
@@ -584,7 +626,7 @@ public class DynamicSearchQueryBuilder {
                 
                 StringBuilder sortClause = new StringBuilder();
                 if (actualField.contains(".")) {
-                    sortClause.append(actualField);
+                    sortClause.append("e.").append(actualField);
                 } else {
                     sortClause.append("e.").append(actualField);
                 }
@@ -644,7 +686,7 @@ public class DynamicSearchQueryBuilder {
             if (defaultColumns == null || defaultColumns.isEmpty()) {
                 logger.error("Default search columns not specified for entity {}. Search will not be performed.", 
                            entity.getEntityClass().getSimpleName());
-                throw new IllegalStateException(
+                throw new CustomException(ErrorCode.INVALID_DATA_FORMAT,
                     "Default search columns must be specified for entity " + 
                     entity.getEntityClass().getSimpleName() + 
                     ". Please implement getDefaultSearchColumns() with at least one field."
@@ -661,7 +703,7 @@ public class DynamicSearchQueryBuilder {
             if (validDefaultColumns.isEmpty()) {
                 logger.error("None of the default search columns are valid for entity {}. Default: {}, Valid searchable fields: {}", 
                            entity.getEntityClass().getSimpleName(), defaultColumns, searchableFields);
-                throw new IllegalStateException(
+                throw new CustomException(ErrorCode.INVALID_DATA_FORMAT,
                     "None of the default search columns are valid for entity " + 
                     entity.getEntityClass().getSimpleName() + 
                     ". Please check getDefaultSearchColumns() implementation."
@@ -739,22 +781,17 @@ public class DynamicSearchQueryBuilder {
                                    value, criteria.getOperator(), actualField, e.getMessage());
                         // Skip this parameter - condition was already filtered out in buildColumnFilterConditions
                     }
+                } else if ("null".equals(criteria.getOperator()) || "notnull".equals(criteria.getOperator())) {
+                    // Null operators don't need parameters
+                    continue;
+                } else if ("activeornorole".equals(criteria.getOperator())) {
+                    // activeornorole operator uses hardcoded condition, no parameters needed
+                    continue;
                 } else if ("gt".equals(criteria.getOperator()) || "lt".equals(criteria.getOperator()) || 
                           "gte".equals(criteria.getOperator()) || "lte".equals(criteria.getOperator()) ||
                           "eq".equals(criteria.getOperator()) || "ne".equals(criteria.getOperator())) {
-                    // Handle numeric operations (try numeric first, fallback to string for eq/ne)
-                    try {
-                        Double numericValue = Double.parseDouble(value);
-                        query.setParameter(paramName, numericValue);
-                    } catch (NumberFormatException e) {
-                        // For eq/ne, fallback to string comparison if not numeric
-                        if ("eq".equals(criteria.getOperator()) || "ne".equals(criteria.getOperator())) {
-                            query.setParameter(paramName, value);
-                        } else {
-                            logger.warn("Invalid numeric value '{}' for {} operation on field '{}'", 
-                                       value, criteria.getOperator(), actualField);
-                        }
-                    }
+                    // Handle type-aware parameter setting
+                    setTypedParameter(query, entity, paramName, actualField, value, criteria.getOperator());
                 } else {
                     // Handle string operations
                     query.setParameter(paramName, value);
@@ -858,7 +895,7 @@ public class DynamicSearchQueryBuilder {
         String originalQuery = baseQuery.trim();
         int fromIndex = normalizedBaseQuery.indexOf(" FROM ");
         if (fromIndex == -1) {
-            throw new IllegalArgumentException("Invalid base query: FROM clause not found");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "Invalid base query: FROM clause not found");
         }
         
         // Extract FROM clause and everything after it (excluding ORDER BY)
@@ -983,26 +1020,62 @@ public class DynamicSearchQueryBuilder {
                                    value, criteria.getOperator(), actualField, e.getMessage());
                         // Skip this parameter - condition was already filtered out in buildColumnFilterConditions
                     }
+                } else if ("null".equals(criteria.getOperator()) || "notnull".equals(criteria.getOperator())) {
+                    // Null operators don't need parameters
+                    continue;
+                } else if ("activeornorole".equals(criteria.getOperator())) {
+                    // activeornorole operator uses hardcoded condition, no parameters needed
+                    continue;
                 } else if ("gt".equals(criteria.getOperator()) || "lt".equals(criteria.getOperator()) || 
                           "gte".equals(criteria.getOperator()) || "lte".equals(criteria.getOperator()) ||
                           "eq".equals(criteria.getOperator()) || "ne".equals(criteria.getOperator())) {
-                    // Handle numeric operations (try numeric first, fallback to string for eq/ne)
-                    try {
-                        Double numericValue = Double.parseDouble(value);
-                        query.setParameter(paramName, numericValue);
-                    } catch (NumberFormatException e) {
-                        // For eq/ne, fallback to string comparison if not numeric
-                        if ("eq".equals(criteria.getOperator()) || "ne".equals(criteria.getOperator())) {
-                            query.setParameter(paramName, value);
-                        } else {
-                            logger.warn("Invalid numeric value '{}' for {} operation on field '{}'", 
-                                       value, criteria.getOperator(), actualField);
-                        }
-                    }
+                    // Handle type-aware parameter setting for count query
+                    setTypedParameter(query, entity, paramName, actualField, value, criteria.getOperator());
                 } else {
                     // Handle string operations
                     query.setParameter(paramName, value);
                 }
+            }
+        }
+    }
+
+    /**
+     * Set typed parameter with intelligent type conversion.
+     * Handles boolean fields stored as Integer (0/1) and other data types.
+     */
+    private <T> void setTypedParameter(TypedQuery<?> query, SearchableEntity<T> entity, 
+                                      String paramName, String fieldName, String value, String operator) {
+        Class<?> fieldType = entity.getFieldType(fieldName);
+        
+        try {
+            if (fieldType == Integer.class) {
+                // Handle boolean fields stored as Integer (0/1)
+                if ("true".equalsIgnoreCase(value) || "1".equals(value)) {
+                    query.setParameter(paramName, 1);
+                } else if ("false".equalsIgnoreCase(value) || "0".equals(value)) {
+                    query.setParameter(paramName, 0);
+                } else {
+                    // Try parsing as integer
+                    query.setParameter(paramName, Integer.parseInt(value));
+                }
+            } else if (fieldType == Long.class) {
+                query.setParameter(paramName, Long.parseLong(value));
+            } else if (fieldType == Double.class || fieldType == Float.class) {
+                query.setParameter(paramName, Double.parseDouble(value));
+            } else if (fieldType == Boolean.class) {
+                query.setParameter(paramName, Boolean.parseBoolean(value));
+            } else {
+                // Default to string
+                query.setParameter(paramName, value);
+            }
+        } catch (NumberFormatException e) {
+            // For eq/ne operations, fallback to string comparison
+            if ("eq".equals(operator) || "ne".equals(operator)) {
+                query.setParameter(paramName, value);
+                logger.debug("Falling back to string comparison for field '{}' with value '{}'", fieldName, value);
+            } else {
+                logger.warn("Invalid {} value '{}' for field '{}' of type {}", 
+                           operator, value, fieldName, fieldType.getSimpleName());
             }
         }
     }

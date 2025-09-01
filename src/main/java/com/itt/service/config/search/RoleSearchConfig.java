@@ -23,7 +23,7 @@ public class RoleSearchConfig implements SearchableEntity<Role> {
 	public Set<String> getSearchableFields() {
 		return Set.of(
 				"isActive", "description", "landingPageConfig", "landingPageConfig.name",
-				"name", "skinName", "skin.name", "createdByUser.email", "createdOn",
+				"name", "skinName", "skin.name", "featureName", "createdByUser.email", "createdOn",
 				"updatedByUser.email", "updatedOn");
 	}
 
@@ -44,7 +44,8 @@ public class RoleSearchConfig implements SearchableEntity<Role> {
 				"roleDescription", "description",
 				"createdBy", "createdByUser.email",
 				"updatedBy", "updatedByUser.email",
-				"landingPage.name", "landingPageConfig.name"
+				"landingPage.name", "landingPageConfig.name",
+				"landingPage", "landingPageConfig"
 				// NOTE: skinName and skin.name handling is done through subquery optimization
 				// See useSubqueryForField() and getSubqueryCondition() methods
 				// Both "skinName" and "skin.name" are supported for flexibility
@@ -83,8 +84,8 @@ public class RoleSearchConfig implements SearchableEntity<Role> {
 	// ✅ SKIN SEARCH OPTIMIZATION: Use subquery for efficient skin search
 	@Override
 	public boolean useSubqueryForField(String field) {
-		// Use EXISTS subquery for skin-related DTO fields
-		return "skinName".equals(field) || "skin.name".equals(field);
+		// Use EXISTS subquery for feature and skin-related fields
+    return "skinName".equals(field) || "skin.name".equals(field) || "featureName".equals(field);
 	}
 
 	@Override
@@ -98,6 +99,38 @@ public class RoleSearchConfig implements SearchableEntity<Role> {
 					"AND LOWER(sc.name) LIKE LOWER(CONCAT('%', :" + paramName + ", '%'))" +
 					")";
 		}
+
+		 if ("featureName".equals(field)) {
+        // ✅ Add subquery for feature name search via mapCategoryFeaturePrivilege
+        return "EXISTS (" +
+                "SELECT 1 FROM MapRoleCategoryFeaturePrivilegeSkin mrcs " +
+                "JOIN mrcs.mapCategoryFeaturePrivilege mcfp " +
+                "JOIN mcfp.feature f " +
+                "WHERE mrcs.role = e " +
+                "AND LOWER(f.name) LIKE LOWER(CONCAT('%', :" + paramName + ", '%'))" +
+                ")";
+    }
 		return null; // Use default JOIN approach for other fields
+	}
+
+	/**
+	 * Define field types for proper parameter handling.
+	 * Critical for boolean (Integer 0/1) and nullable fields.
+	 */
+	@Override
+	public Class<?> getFieldType(String fieldName) {
+		// Map field aliases to actual field names first
+		String actualField = getFieldAliases().getOrDefault(fieldName, fieldName);
+		
+		return switch (actualField) {
+			case "isActive" -> Integer.class; // Boolean stored as Integer (0/1)
+			case "landingPageConfig" -> com.itt.service.entity.MasterConfig.class;
+			case "landingPageConfig.name", "landingPageConfig.keyCode" -> String.class;
+			case "landingPageConfig.id" -> Long.class;
+			case "name", "description" -> String.class;
+			case "createdByUser.email", "updatedByUser.email" -> String.class;
+			case "createdOn", "updatedOn" -> java.time.LocalDateTime.class;
+			default -> String.class; // Default to String for unknown fields
+		};
 	}
 }

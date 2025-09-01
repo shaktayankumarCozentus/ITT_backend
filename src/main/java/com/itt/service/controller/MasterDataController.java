@@ -2,7 +2,6 @@ package com.itt.service.controller;
 
 import java.util.List;
 
-import com.itt.service.fw.audit.annotation.EventAuditLogger;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;

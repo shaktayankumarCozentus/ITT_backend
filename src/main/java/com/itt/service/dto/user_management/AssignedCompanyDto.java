@@ -12,7 +12,7 @@ import lombok.*;
 public class AssignedCompanyDto {
 
     @Schema(description = "Company code", example = "comp_001")
-    private String companyCode;
+    private Integer companyCode;
 
 
     @Schema(description = "Company name", example = "ABC Corporation")

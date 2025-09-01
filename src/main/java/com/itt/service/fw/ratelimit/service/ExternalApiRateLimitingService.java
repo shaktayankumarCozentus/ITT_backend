@@ -1,6 +1,8 @@
 package com.itt.service.fw.ratelimit.service;
 
 import com.itt.service.fw.ratelimit.properties.ExternalApiRateLimitProperties;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -151,21 +153,18 @@ public class ExternalApiRateLimitingService {
      *
      * @param apiKey the API key or authentication identifier
      * @return The rate-limiting {@link Bucket} associated with the API key
-     * @throws IllegalArgumentException if apiKey is null or empty
+     * @throws CustomException if apiKey is null or empty
      */
     public Bucket getExternalApiBucket(@NonNull final String apiKey) {
         if (!StringUtils.hasText(apiKey)) {
-            throw new IllegalArgumentException("API key cannot be null or empty");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "API key cannot be null or empty");
         }
         
         if (!rateLimitingEnabled) {
-            log.debug("🔓 External API rate limiting is disabled, returning unlimited bucket");
             return createUnlimitedBucket();
         }
         
         String cacheKey = generateCacheKey(apiKey);
-        log.debug("🔑 Getting rate limit bucket for API key: {} (cache key: {})", 
-                 maskApiKey(apiKey), cacheKey);
         
         return proxyManager.builder().build(cacheKey, () -> createExternalApiBucketConfiguration(apiKey));
     }
@@ -175,11 +174,11 @@ public class ExternalApiRateLimitingService {
      * Useful for configuration changes or administrative actions.
      *
      * @param apiKey the API key to reset rate limiting for
-     * @throws IllegalArgumentException if apiKey is null or empty
+     * @throws CustomException if apiKey is null or empty
      */
     public void resetExternalApiRateLimit(@NonNull final String apiKey) {
         if (!StringUtils.hasText(apiKey)) {
-            throw new IllegalArgumentException("API key cannot be null or empty");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "API key cannot be null or empty");
         }
         
         String cacheKey = generateCacheKey(apiKey);

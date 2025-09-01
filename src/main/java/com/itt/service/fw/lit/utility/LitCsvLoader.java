@@ -8,6 +8,8 @@ import com.itt.service.fw.lit.enums.UploadStatus;
 import com.itt.service.fw.lit.exception.CsvValidationException;
 import com.itt.service.fw.lit.service.impl.LitAuditService;
 import com.itt.service.fw.logger.api.annotation.Loggable;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.repository.LitMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,7 +62,7 @@ public class LitCsvLoader {
 //                }
 //            }
         } else {
-            throw new IllegalArgumentException("Unsupported file type: " + originalFilename);
+            throw new CustomException(ErrorCode.INVALID_FILE_FORMAT, "Unsupported file type: " + originalFilename);
         }
 
         if (!errorRows.isEmpty()) {

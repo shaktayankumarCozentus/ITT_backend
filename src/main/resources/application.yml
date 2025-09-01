@@ -1,0 +1,853 @@
+# =============================================================================
+# PORTAL USER SERVICE - UNIFIED CONFIGURATION
+# =============================================================================
+# This single file contains all environment-specific configurations.
+# Active profile determines which configuration section is used.
+# 
+# Usage:
+#   - Development: --spring.profiles.active=dev
+#   - Testing:     --spring.profiles.active=test  
+#   - Staging:     --spring.profiles.active=stage
+#   - Production:  --spring.profiles.active=prod
+# =============================================================================
+
+spring:
+  application:
+    name: portal-user-service
+  profiles:
+    active: dev  # Default to development environment
+
+---
+# =============================================================================
+# DEVELOPMENT ENVIRONMENT
+# =============================================================================
+# Complete configuration for local development with:
+# - SQL logging enabled for debugging
+# - Security disabled for easier testing
+# - Moderate connection pool sizes
+# - Comprehensive logging for troubleshooting
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: dev
+  application:
+    name: portal-user-service-dev
+
+  # JPA & Hibernate Configuration
+  jpa:
+    show-sql: true              # Enable SQL logging for development
+    hibernate:
+      ddl-auto: none            # Never auto-generate schema (safety first)
+    open-in-view: true          # Keep Hibernate session open for view layer
+    properties:
+      hibernate:
+        show_sql: true          # Show SQL statements in logs
+        format_sql: true        # Format SQL for readability
+        generate_statistics: false
+        # Batch processing optimization
+        jdbc:
+          batch_size: 50        # Process 50 statements in a batch
+        order_inserts: true     # Order inserts for better performance
+        order_updates: true     # Order updates for better performance
+
+  # Read/Write Database Separation Configuration
+  # Optimizes performance by separating read and write operations
+  # Dev environment: 150 max DB connections total
+
+# Comprehensive Database Configuration - Environment-specific settings
+app:
+  database:
+    # Driver Configuration - Environment-specific (regular MySQL for dev)
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # Write Pool Configuration - For INSERT, UPDATE, DELETE operations
+    write:
+      maximum-pool-size: 75           # Write pool size (50% of total capacity)
+      minimum-idle: 5                 # Conservative minimum for dev
+      connection-timeout: 20000       # 20 seconds to get connection
+      idle-timeout: 300000            # 5 minutes idle before cleanup
+      max-lifetime: 1200000           # 20 minutes max connection lifetime
+      leak-detection-threshold: 60000 # 1 minute leak detection
+      validation-timeout: 5000        # 5 seconds validation timeout
+      connection-properties:
+        cache-prep-stmts: true          # Enable prepared statement caching
+        prep-stmt-cache-size: 250       # Cache size for write operations
+        prep-stmt-cache-sql-limit: 2048 # Max SQL length to cache
+        use-server-prep-stmts: true     # Use server-side prepared statements
+        rewrite-batched-statements: true # Enable batch rewriting for performance
+        use-multi-queries: true         # Allow multiple queries (dev only)
+        allow-multi-queries: true       # Security setting for multi-queries
+        use-local-session-state: true   # Optimize session state management
+        use-local-transaction-state: true # Optimize transaction state
+    # Read Pool Configuration - For SELECT operations
+    read:
+      maximum-pool-size: 75           # Read pool size (50% of total capacity)
+      minimum-idle: 10                # Slightly higher minimum for reads
+      connection-timeout: 10000       # 10 seconds (faster for reads)
+      idle-timeout: 600000            # 10 minutes idle timeout
+      max-lifetime: 1800000           # 30 minutes max lifetime
+      leak-detection-threshold: 0     # Disabled for read-only operations
+      validation-timeout: 3000        # 3 seconds validation timeout
+      connection-properties:
+        cache-prep-stmts: true          # Enable prepared statement caching
+        prep-stmt-cache-size: 500       # Larger cache for read operations
+        prep-stmt-cache-sql-limit: 2048 # Max SQL length to cache
+        use-server-prep-stmts: true     # Use server-side prepared statements
+        # Batch settings disabled for read-only operations
+        rewrite-batched-statements: false
+        use-multi-queries: false
+        allow-multi-queries: false
+        use-local-session-state: false
+        use-local-transaction-state: false
+    # JPA/Hibernate Configuration
+    jpa:
+      ddl-auto: none                  # Never auto-generate schema
+      dialect: org.hibernate.dialect.MySQL8Dialect
+      show-sql: true                  # Enable SQL logging for development
+      format-sql: true                # Format SQL for readability
+      use-sql-comments: true          # Add comments to SQL
+      generate-statistics: false      # Disable statistics for performance
+      batch-size: 50                  # Batch size for development
+      order-inserts: true             # Order inserts for better batching
+      order-updates: true             # Order updates for better batching
+      batch-versioned-data: true      # Enable batching for versioned entities
+      new-generator-mappings: true    # Use modern ID generators
+      use-get-generated-keys: true    # Efficient ID retrieval
+      default-batch-fetch-size: 16    # Lazy loading batch size
+      lob-non-contextual-creation: true # LOB handling optimization
+  # Security Configuration
+  security:
+    enabled: false              # Disabled for easier development & testing
+
+# Server Configuration
+server:
+  port: 8080                    # Standard development port
+  compression:
+    enabled: true               # Enable response compression for better performance
+  servlet:
+    context-path: /             # Root context path
+  tomcat:
+    threads:
+      max: 200                  # Maximum number of worker threads
+      min-spare: 10             # Minimum number of spare threads
+
+# Spring Boot Actuator Configuration
+# Provides monitoring and management endpoints for production readiness
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,configprops,env  # Expose essential monitoring endpoints
+  endpoint:
+    health:
+      show-details: always      # Show detailed health information
+    configprops:
+      show-values: when_authorized  # Show configuration values when authorized
+
+# AWS Services Configuration
+cloud:
+  aws:
+    region:
+      static: us-east-1         # Fixed AWS region
+      auto: false               # Don't auto-detect region
+    secret-name: 'apps-itt-service-secrets-dev'    # Dev secrets in AWS
+    s3:
+      bucket-name: 'itt-service-dev-bucket'        # Dev S3 bucket
+
+# External API Rate Limiting
+# Prevents abuse and ensures fair usage of external services
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 1000   # Allow 1000 requests per hour
+      requests-per-minute: 100  # Burst limit: 100 per minute
+      burst-capacity: 10        # Immediate burst capacity
+
+# API Documentation Configuration
+# Swagger/OpenAPI for interactive API testing and documentation
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs    # JSON endpoint for API documentation
+    enabled: true               # Enable in development
+  swagger-ui:
+    path: /api/docs/swagger-ui.html  # Interactive UI endpoint
+    enabled: true               # Enable Swagger UI in development
+  packages-to-scan: com.itt.service # Scan only our packages
+
+# Logging Configuration
+# Optimized for the perfected exception framework with production-ready performance
+logging:
+  file:
+    name: myapp.log             # Log file name
+    max-size: 4MB               # Rotate when file reaches 4MB
+    max-history: 30             # Keep 30 old log files
+    total-size-cap: 1GB         # Max total size of all log files
+    path: logs                  # Log directory
+  level:
+    root: INFO                  # General log level
+    # Framework Excellence: Optimized logging for perfect exception handling
+    # Disable noisy Hibernate statistics logging
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: OFF
+    org.hibernate.SQL: DEBUG   # Show SQL statements
+    org.hibernate.type: WARN   # Show SQL parameter values (WARN to reduce noise)
+    com.zaxxer.hikari: WARN     # HikariCP connection pool logs
+    com.itt.service.config.security: DEBUG  # Our security configuration
+    com.itt.service.fw.search: DEBUG  # Universal Search Framework debugging
+    com.itt.service.config.search: DEBUG  # Search configuration debugging
+    com.itt.service.specification: DEBUG  # Filter parsing debugging
+    # Perfected Exception Framework - Production optimized logging
+    com.itt.service.exception: INFO   # Exception handlers - production optimized
+    com.itt.service.validator: INFO   # Validator logging - essential only  
+    com.itt.service.fw.ratelimit: INFO # Rate limiting framework - clean logging
+
+# Cache Configuration
+# In-memory caching for improved performance
+cache:
+  type: caffeine              # Use Caffeine for local caching
+  refresh-minutes: 10         # Refresh cache every 10 minutes
+  ttl-minutes: 10            # Cache expires after 10 minutes
+  redis:
+    key-prefix: "lit:"        # Prefix for Redis keys (if used)
+
+# Application-Specific Configuration
+com:
+  itt:
+    common:
+      open-api:
+        enabled: true
+        api-version: 1.0.0
+        title: portal-user-service-dev
+        description: Service API
+      token:
+        # DEV ONLY - Never use this key in production!
+        secret-key: 093617ebfa4b9af9700db274ac204ffa34195494d97b9c26c23ad561de817926
+        validity: 120           # Token validity in minutes
+
+# LIT Cache Configuration
+# Additional caching layer for specific business logic
+lit:
+  cache:
+    type: memory              # Use in-memory cache
+    refresh-minutes: 10       # Refresh every 10 minutes
+    redis:
+      key-prefix: "lit:"      # Redis key prefix
+
+# Audit Configuration
+# Tracks system changes and user activities
+audit:
+  config:
+    refresh-interval: 4h      # Refresh audit config every 4 hours
+                             # Supported units: ns, ms, s, m, h, d
+
+---
+# =============================================================================
+# TEST ENVIRONMENT
+# =============================================================================
+# Configuration for automated testing and QA with:
+# - Security enabled for realistic testing
+# - Reduced rate limits for controlled testing
+# - Moderate logging for test analysis
+# - Same database setup as dev for consistency
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: test
+  application:
+    name: portal-user-service-test
+
+  jpa:
+    show-sql: true              # Keep SQL logging for test debugging
+    hibernate:
+      ddl-auto: none            # Never auto-generate schema
+    open-in-view: true
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        generate_statistics: false
+        jdbc:
+          batch_size: 50        # Same as dev for consistency
+        order_inserts: true
+        order_updates: true
+
+  # Read/Write DataSource Configuration
+  # Test environment: 1000 max DB connections total - conservative allocation
+
+# Comprehensive Database Configuration - Test environment settings
+app:
+  database:
+    # Driver Configuration - Environment-specific
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    write:
+      maximum-pool-size: 75           # Conservative for test stability
+      minimum-idle: 5                 # Low minimum for test efficiency
+      connection-timeout: 20000       # 20 seconds timeout
+      idle-timeout: 300000            # 5 minutes idle cleanup
+      max-lifetime: 1200000           # 20 minutes max lifetime
+      leak-detection-threshold: 60000 # 1 minute leak detection
+      validation-timeout: 5000        # 5 seconds validation
+      connection-properties:
+        cache-prep-stmts: true          # Enable prepared statement caching
+        prep-stmt-cache-size: 200       # Smaller cache for test efficiency
+        prep-stmt-cache-sql-limit: 2048
+        use-server-prep-stmts: true
+        rewrite-batched-statements: true # Enable for testing batch operations
+        use-multi-queries: false        # Disabled for test security
+        allow-multi-queries: false
+        use-local-session-state: true   # Performance optimization
+        use-local-transaction-state: true
+    read:
+      maximum-pool-size: 75           # Conservative read pool
+      minimum-idle: 10                # Moderate minimum for reads
+      connection-timeout: 10000       # 10 seconds for reads
+      idle-timeout: 600000            # 10 minutes idle timeout
+      max-lifetime: 1800000           # 30 minutes max lifetime
+      leak-detection-threshold: 0     # Disabled for read-only
+      validation-timeout: 3000        # 3 seconds validation
+      connection-properties:
+        cache-prep-stmts: true
+        prep-stmt-cache-size: 300       # Moderate cache for test reads
+        prep-stmt-cache-sql-limit: 2048
+        use-server-prep-stmts: true
+        rewrite-batched-statements: false # Disabled for read-only
+        use-multi-queries: false
+        allow-multi-queries: false
+        use-local-session-state: false
+        use-local-transaction-state: false
+    jpa:
+      ddl-auto: none                  # Never auto-generate schema
+      dialect: org.hibernate.dialect.MySQL8Dialect
+      show-sql: false                 # Disable SQL logging for test performance
+      format-sql: true
+      use-sql-comments: false         # Reduce overhead in tests
+      generate-statistics: false
+      batch-size: 50                  # Same as dev for consistency
+      order-inserts: true
+      order-updates: true
+      batch-versioned-data: true
+      new-generator-mappings: true
+      use-get-generated-keys: true
+      default-batch-fetch-size: 16
+      lob-non-contextual-creation: true
+  # Security Configuration
+  security:
+    enabled: true               # Enable security for realistic testing
+
+# Server Configuration
+server:
+  port: 8080                    # Standard test port
+  compression:
+    enabled: true               # Enable response compression
+  servlet:
+    context-path: /             # Root context path
+  tomcat:
+    threads:
+      max: 150                  # Moderate thread pool for testing
+      min-spare: 10             # Minimum spare threads
+
+# Spring Boot Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,configprops,env  # Expose monitoring endpoints for testing
+  endpoint:
+    health:
+      show-details: always      # Show detailed health information
+    configprops:
+      show-values: when_authorized  # Show configuration values when authorized
+
+# AWS Services Configuration
+cloud:
+  aws:
+    region:
+      static: us-east-1
+      auto: false
+    secret-name: 'apps-itt-service-secrets-test'   # Test-specific secrets
+    s3:
+      bucket-name: 'itt-service-test-bucket'       # Test S3 bucket
+
+# External API Rate Limiting - Reduced for testing
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 500    # Lower limits for controlled testing
+      requests-per-minute: 50
+      burst-capacity: 5
+
+# API Documentation - Enabled for testing
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs
+    enabled: true
+  swagger-ui:
+    path: /api/docs/swagger-ui.html
+    enabled: true
+  packages-to-scan: com.itt.service
+
+# Logging Configuration - Optimized for testing with perfected exception framework
+logging:
+  file:
+    name: myapp.log
+    max-size: 4MB
+    max-history: 30
+    total-size-cap: 1GB
+    path: logs
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN     # Reduce SQL noise in tests
+    com.itt.service.config.security: INFO  # Monitor security in tests
+    # Perfected Exception Framework - Test optimized
+    com.itt.service.exception: INFO   # Exception handlers - test monitoring
+    com.itt.service.validator: INFO   # Validator testing - essential only
+    com.itt.service.fw.ratelimit: INFO # Rate limiting - test performance
+
+# Cache Configuration - Same as dev
+cache:
+  type: caffeine
+  refresh-minutes: 10
+  ttl-minutes: 10
+  redis:
+    key-prefix: "lit:"
+
+# Application-Specific Configuration
+com:
+  itt:
+    common:
+      open-api:
+        enabled: true
+        api-version: 1.0.0
+        title: portal-user-service-test
+        description: Service API
+      token:
+        # TEST ENVIRONMENT - Use secure key in production
+        secret-key: test-secret-key-change-in-production
+        validity: 120
+
+# LIT Cache Configuration
+lit:
+  cache:
+    type: memory
+    refresh-minutes: 10
+    redis:
+      key-prefix: "lit:"
+
+# Audit Configuration
+audit:
+  config:
+    refresh-interval: 4h
+
+---
+# =============================================================================
+# STAGING ENVIRONMENT
+# =============================================================================
+# Pre-production environment that mirrors production settings with:
+# - Schema validation (ddl-auto: validate) for safety
+# - Larger connection pools for load testing
+# - Higher rate limits for performance testing
+# - Comprehensive logging for pre-prod debugging
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: stage
+  application:
+    name: portal-user-service-stage
+
+  jpa:
+    show-sql: false             # Disable SQL logging for performance
+    hibernate:
+      ddl-auto: validate        # Validate schema matches entities (safety)
+    open-in-view: true
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: true
+        generate_statistics: false
+        jdbc:
+          batch_size: 75        # Larger batches for staging performance
+        order_inserts: true
+        order_updates: true
+
+  # Read/Write DataSource Configuration
+  # Staging environment: 2000 max DB connections total - moderate utilization
+
+# Comprehensive Database Configuration - Staging environment settings
+app:
+  database:
+    # Driver Configuration - Environment-specific
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    write:
+      maximum-pool-size: 112          # ~11% of total DB capacity for writes
+      minimum-idle: 10                # Higher minimum for staging load
+      connection-timeout: 20000       # 20 seconds timeout
+      idle-timeout: 300000            # 5 minutes idle cleanup
+      max-lifetime: 1200000           # 20 minutes max lifetime
+      leak-detection-threshold: 60000 # 1 minute leak detection
+      validation-timeout: 5000        # 5 seconds validation
+      connection-properties:
+        cache-prep-stmts: true
+        prep-stmt-cache-size: 300       # Larger cache for staging performance
+        prep-stmt-cache-sql-limit: 2048
+        use-server-prep-stmts: true
+        rewrite-batched-statements: true # Enable batch optimizations
+        use-multi-queries: false        # Security: disabled in staging
+        allow-multi-queries: false
+        use-local-session-state: true   # Performance optimizations
+        use-local-transaction-state: true
+    read:
+      maximum-pool-size: 113          # ~11% of total DB capacity for reads
+      minimum-idle: 15                # Higher read minimum for performance
+      connection-timeout: 10000       # 10 seconds for reads
+      idle-timeout: 600000            # 10 minutes idle timeout
+      max-lifetime: 1800000           # 30 minutes max lifetime
+      leak-detection-threshold: 0     # Disabled for read-only
+      validation-timeout: 3000        # 3 seconds validation
+      connection-properties:
+        cache-prep-stmts: true
+        prep-stmt-cache-size: 400       # Large cache for staging reads
+        prep-stmt-cache-sql-limit: 2048
+        use-server-prep-stmts: true
+        rewrite-batched-statements: false
+        use-multi-queries: false
+        allow-multi-queries: false
+        use-local-session-state: false
+        use-local-transaction-state: false
+    jpa:
+      ddl-auto: validate              # Validate schema in staging
+      dialect: org.hibernate.dialect.MySQL8Dialect
+      show-sql: false                 # Disable SQL logging for performance
+      format-sql: true
+      use-sql-comments: false         # Reduce overhead
+      generate-statistics: true       # Enable statistics for monitoring
+      batch-size: 75                  # Larger batches for staging
+      order-inserts: true
+      order-updates: true
+      batch-versioned-data: true
+      new-generator-mappings: true
+      use-get-generated-keys: true
+      default-batch-fetch-size: 20    # Larger fetch size for performance
+      lob-non-contextual-creation: true
+  # Security Configuration
+  security:
+    enabled: true               # Security enabled for realistic testing
+
+# Server Configuration
+server:
+  port: 8080                    # Standard staging port
+  compression:
+    enabled: true               # Enable response compression
+  servlet:
+    context-path: /             # Root context path
+  tomcat:
+    threads:
+      max: 300                  # Higher thread pool for load testing
+      min-spare: 20             # More spare threads for performance
+
+# Spring Boot Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,configprops,env  # Expose monitoring endpoints for staging
+  endpoint:
+    health:
+      show-details: always      # Show detailed health information
+    configprops:
+      show-values: always       # Show all configuration values in staging
+
+# AWS Services Configuration
+cloud:
+  aws:
+    region:
+      static: us-east-1
+      auto: false
+    secret-name: 'apps-itt-service-secrets-stage'  # Stage-specific secrets
+    s3:
+      bucket-name: 'itt-service-stage-bucket'      # Stage S3 bucket
+
+# External API Rate Limiting - Higher limits for load testing
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 2000   # Higher limits for performance testing
+      requests-per-minute: 200
+      burst-capacity: 20
+
+# API Documentation - Enabled for staging validation
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs
+    enabled: true
+  swagger-ui:
+    path: /api/docs/swagger-ui.html
+    enabled: true
+  packages-to-scan: com.itt.service
+
+# Logging Configuration - Production-like with perfected exception framework
+logging:
+  file:
+    name: myapp.log
+    max-size: 10MB              # Larger log files for staging
+    max-history: 60             # Keep more history for analysis
+    total-size-cap: 5GB         # Higher cap for extended testing
+    path: logs
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN     # Minimal SQL logging
+    com.itt.service.config.security: INFO
+    # Perfected Exception Framework - Staging performance
+    com.itt.service.exception: INFO   # Exception handlers - performance monitoring
+    com.itt.service.validator: INFO   # Validator performance - optimized logging
+    com.itt.service.fw.ratelimit: INFO # Rate limiting - staging validation
+
+# Cache Configuration
+cache:
+  type: caffeine
+  refresh-minutes: 10
+  ttl-minutes: 10
+  redis:
+    key-prefix: "lit:"
+
+# Application-Specific Configuration
+com:
+  itt:
+    common:
+      open-api:
+        enabled: true
+        api-version: 1.0.0
+        title: portal-user-service-stage
+        description: Service API
+      token:
+        # STAGING - Use environment-specific secure key
+        secret-key: stage-secret-key-change-in-production
+        validity: 120
+
+# LIT Cache Configuration
+lit:
+  cache:
+    type: memory
+    refresh-minutes: 10
+    redis:
+      key-prefix: "lit:"
+
+# Audit Configuration
+audit:
+  config:
+    refresh-interval: 4h
+
+---
+# =============================================================================
+# PRODUCTION ENVIRONMENT
+# =============================================================================
+# Production configuration optimized for performance, security, and reliability:
+# - No SQL logging for performance
+# - API documentation disabled for security
+# - Maximum connection pools for high load
+# - Minimal logging (WARN level) to reduce I/O
+# - Highest rate limits for production traffic
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+  application:
+    name: portal-user-service-prod
+
+  jpa:
+    show-sql: false             # CRITICAL: No SQL logging in production
+    hibernate:
+      ddl-auto: none            # NEVER modify schema in production
+    open-in-view: true
+    properties:
+      hibernate:
+        show_sql: false         # Ensure no SQL in logs
+        format_sql: false       # No formatting overhead
+        generate_statistics: false
+        jdbc:
+          batch_size: 100       # Largest batches for max performance
+        order_inserts: true
+        order_updates: true
+
+  # Read/Write DataSource Configuration
+  # Production environment: 3000 max DB connections total - optimized allocation
+
+# Comprehensive Database Configuration - Production environment settings
+app:
+  database:
+    # Driver Configuration - Environment-specific
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    write:
+      maximum-pool-size: 150          # 5% of total DB capacity for writes
+      minimum-idle: 15                # High minimum for instant response
+      connection-timeout: 20000       # 20 seconds timeout
+      idle-timeout: 300000            # 5 minutes idle cleanup
+      max-lifetime: 1200000           # 20 minutes max lifetime
+      leak-detection-threshold: 60000 # 1 minute leak detection
+      validation-timeout: 5000        # 5 seconds validation
+      connection-properties:
+        cache-prep-stmts: true
+        prep-stmt-cache-size: 500       # Maximum cache for production
+        prep-stmt-cache-sql-limit: 4096  # Larger SQL limit for complex queries
+        use-server-prep-stmts: true
+        rewrite-batched-statements: true # CRITICAL: Enable batch optimization
+        use-multi-queries: false        # SECURITY: Disabled in production
+        allow-multi-queries: false      # SECURITY: Disabled in production
+        use-local-session-state: true   # Maximum performance optimization
+        use-local-transaction-state: true
+    read:
+      maximum-pool-size: 150          # 5% of total DB capacity for reads
+      minimum-idle: 20                # High read minimum for performance
+      connection-timeout: 10000       # 10 seconds for reads
+      idle-timeout: 600000            # 10 minutes idle timeout
+      max-lifetime: 1800000           # 30 minutes max lifetime
+      leak-detection-threshold: 0     # Disabled for read-only
+      validation-timeout: 3000        # 3 seconds validation
+      connection-properties:
+        cache-prep-stmts: true
+        prep-stmt-cache-size: 1000      # Maximum cache for production reads
+        prep-stmt-cache-sql-limit: 4096  # Large SQL limit for complex reports
+        use-server-prep-stmts: true
+        rewrite-batched-statements: false # Read-only: no batching needed
+        use-multi-queries: false
+        allow-multi-queries: false
+        use-local-session-state: false
+        use-local-transaction-state: false
+    jpa:
+      ddl-auto: none                  # NEVER modify schema in production
+      dialect: org.hibernate.dialect.MySQL8Dialect
+      show-sql: false                 # CRITICAL: No SQL logging in production
+      format-sql: false               # No formatting overhead
+      use-sql-comments: false         # No comments overhead
+      generate-statistics: false      # Disable statistics for performance
+      batch-size: 100                 # Maximum batch size for performance
+      order-inserts: true
+      order-updates: true
+      batch-versioned-data: true
+      new-generator-mappings: true
+      use-get-generated-keys: true
+      default-batch-fetch-size: 32    # Maximum fetch size for performance
+      lob-non-contextual-creation: true
+  # Security Configuration
+  security:
+    enabled: true               # CRITICAL: Security must be enabled in production
+
+# Server Configuration
+server:
+  port: 8080                    # Standard production port
+  compression:
+    enabled: true               # CRITICAL: Enable compression for performance
+  servlet:
+    context-path: /             # Root context path
+  tomcat:
+    threads:
+      max: 400                  # Maximum thread pool for high load
+      min-spare: 50             # High spare threads for instant response
+    max-connections: 8192       # Maximum concurrent connections
+    accept-count: 100           # Queue size for incoming connections
+
+# Spring Boot Actuator Configuration - RESTRICTED FOR PRODUCTION
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info     # SECURITY: Only expose health and info in production
+  endpoint:
+    health:
+      show-details: when_authorized  # SECURITY: Restrict health details
+    configprops:
+      show-values: never        # SECURITY: Never show config values in production
+
+# AWS Services Configuration
+cloud:
+  aws:
+    region:
+      static: us-east-1
+      auto: false
+    secret-name: 'apps-itt-service-secrets-prod'   # Production secrets
+    s3:
+      bucket-name: 'itt-service-prod-bucket'       # Production S3 bucket
+
+# External API Rate Limiting - Maximum limits for production
+external-api:
+  rate-limiting:
+    enabled: true
+    default-config:
+      requests-per-hour: 5000   # High production limits
+      requests-per-minute: 500
+      burst-capacity: 50
+
+# API Documentation - DISABLED FOR SECURITY
+springdoc:
+  api-docs:
+    path: /api/docs/api-docs
+    enabled: false              # SECURITY: Never expose API docs in production
+  swagger-ui:
+    path: /api/docs/swagger-ui.html
+    enabled: false              # SECURITY: Never expose Swagger UI in production
+  packages-to-scan: com.itt.service
+
+# Logging Configuration - Minimal for production performance with optimized exception framework
+logging:
+  file:
+    name: myapp.log
+    max-size: 20MB              # Larger files for production
+    max-history: 90             # Keep 3 months of logs
+    total-size-cap: 10GB        # Maximum total log size
+    path: logs
+  level:
+    root: WARN                  # Minimal logging for performance
+    # Framework Excellence: Maximum production performance
+    # Disable all development/debug logging
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: OFF
+    org.hibernate.SQL: OFF      # CRITICAL: No SQL logging
+    org.hibernate.type: OFF     # No parameter logging
+    com.zaxxer.hikari: ERROR    # Only HikariCP errors
+    com.itt.service.config.security: WARN  # Security warnings only
+    # Perfected Exception Framework - Production optimized
+    com.itt.service.exception: WARN   # Exception handlers - errors only
+    com.itt.service.validator: WARN   # Validator - critical issues only
+    com.itt.service.fw.ratelimit: WARN # Rate limiting - warnings only
+
+# Cache Configuration
+cache:
+  type: caffeine
+  refresh-minutes: 10
+  ttl-minutes: 10
+  redis:
+    key-prefix: "lit:"
+
+# Application-Specific Configuration
+com:
+  itt:
+    common:
+      open-api:
+        enabled: true           # Keep enabled for internal documentation
+        api-version: 1.0.0
+        title: portal-user-service-prod
+        description: Service API
+      token:
+        # PRODUCTION: This should be retrieved from AWS Secrets Manager
+        secret-key: production-secret-key-from-secrets-manager
+        validity: 120
+
+# LIT Cache Configuration
+lit:
+  cache:
+    type: memory
+    refresh-minutes: 10
+    redis:
+      key-prefix: "lit:"
+
+# Audit Configuration
+audit:
+  config:
+    refresh-interval: 4h        # Refresh audit configuration every 4 hours

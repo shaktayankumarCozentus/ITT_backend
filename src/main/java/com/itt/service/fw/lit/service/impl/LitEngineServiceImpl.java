@@ -6,6 +6,8 @@ import com.itt.service.fw.lit.exception.NoDataFoundException;
 import com.itt.service.fw.lit.service.LitEngineService;
 import com.itt.service.fw.lit.utility.CommonUtils;
 import com.itt.service.fw.logger.api.annotation.Loggable;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.repository.LitMessageRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -79,7 +81,7 @@ public class LitEngineServiceImpl implements LitEngineService {
         try {
             return null;//LitExcelExporter.toExcel(messages);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to generate Excel file", e);
+            throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED, "Failed to generate Excel file", e);
         }
     }
 }

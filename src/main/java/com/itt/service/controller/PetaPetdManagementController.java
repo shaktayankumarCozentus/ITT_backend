@@ -53,7 +53,7 @@ public class PetaPetdManagementController implements PetaPetdManagementDocumenta
 		return ResponseBuilder.success(configs);
 	}
 
-	@PutMapping("/bulk-update-tier")
+	@PutMapping("/bulk-update")
 	@PreAuthorize("hasRole('ROLE_PETA_PETD_MANAGEMENT_EDIT')")
 	public ResponseEntity<ApiResponse<Void>> bulkUpdatePetaPetd(@Valid @RequestBody PetaPetdBulkUpdateRequest request) {
 		String responseMessage = petaPetdManagementService.bulkUpdatePetaPetd(request);

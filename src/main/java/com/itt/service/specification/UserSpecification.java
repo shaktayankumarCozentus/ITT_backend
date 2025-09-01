@@ -68,4 +68,18 @@ public class UserSpecification {
             return cb.equal(role.get("isActive"), 0);
         };
     }
+
+    /**
+     * NEW: Users with active role OR no role assigned
+     * This uses LEFT JOIN to include users without roles
+     */
+    public static Specification<MasterUser> hasActiveRoleOrNoRole() {
+        return (root, query, cb) -> {
+            Join<MasterUser, Role> role = root.join("assignedRole", JoinType.LEFT);
+            return cb.or(
+                cb.isNull(role.get("id")), // No role assigned
+                cb.equal(role.get("isActive"), 1) // Or has active role
+            );
+        };
+    }
 }

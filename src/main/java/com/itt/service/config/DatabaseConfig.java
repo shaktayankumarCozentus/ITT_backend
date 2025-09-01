@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -34,10 +37,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 @EnableTransactionManagement
+@EnableConfigurationProperties(DataSourceProperties.class)
 @EnableJpaRepositories(basePackages = "com.itt.service.repository", entityManagerFactoryRef = "entityManagerFactory", transactionManagerRef = "transactionManager")
 public class DatabaseConfig {
 
-	private static final String DRIVER_CLASS_NAME = "com.mysql.cj.jdbc.Driver";
+	@Autowired
+	private DataSourceProperties dataSourceProperties;
 
 	// ==========================================
 	// WRITE DATASOURCE (PRIMARY)
@@ -59,30 +64,34 @@ public class DatabaseConfig {
 				awsSecrets.getDatabaseWriteDatabase()));
 		config.setUsername(awsSecrets.getDatabaseWriteUsername());
 		config.setPassword(awsSecrets.getDatabaseWritePassword());
-		config.setDriverClassName(DRIVER_CLASS_NAME);
+		config.setDriverClassName(dataSourceProperties.getDriverClassName());
 
-		// Write-optimized connection pool settings
-		config.setMaximumPoolSize(50);
-		config.setMinimumIdle(10);
-		config.setIdleTimeout(300000); // 5 minutes
-		config.setMaxLifetime(1800000); // 30 minutes
-		config.setConnectionTimeout(20000); // 20 seconds
-		config.setLeakDetectionThreshold(60000); // 1 minute
-		config.setValidationTimeout(5000); // 5 seconds
+		// Get environment-specific connection pool settings from YAML
+		DataSourceProperties.PoolConfig writeConfig = dataSourceProperties.getWriteHikariConfig();
+		DataSourceProperties.ConnectionProperties writeConnProps = writeConfig.getConnectionProperties();
+		
+		// Apply YAML-configured connection pool settings
+		config.setMaximumPoolSize(writeConfig.getMaximumPoolSize());
+		config.setMinimumIdle(writeConfig.getMinimumIdle());
+		config.setIdleTimeout(writeConfig.getIdleTimeout());
+		config.setMaxLifetime(writeConfig.getMaxLifetime());
+		config.setConnectionTimeout(writeConfig.getConnectionTimeout());
+		config.setLeakDetectionThreshold(writeConfig.getLeakDetectionThreshold());
+		config.setValidationTimeout(writeConfig.getValidationTimeout());
 		config.setAutoCommit(false); // CRITICAL: Disable autocommit for transactions
 
-		// Write-specific optimizations
-		config.addDataSourceProperty("cachePrepStmts", "true");
-		config.addDataSourceProperty("prepStmtCacheSize", "250");
-		config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-		config.addDataSourceProperty("useServerPrepStmts", "true");
+		// Write-specific optimizations from YAML configuration
+		config.addDataSourceProperty("cachePrepStmts", String.valueOf(writeConnProps.getCachePrepStmts()));
+		config.addDataSourceProperty("prepStmtCacheSize", String.valueOf(writeConnProps.getPrepStmtCacheSize()));
+		config.addDataSourceProperty("prepStmtCacheSqlLimit", String.valueOf(writeConnProps.getPrepStmtCacheSqlLimit()));
+		config.addDataSourceProperty("useServerPrepStmts", String.valueOf(writeConnProps.getUseServerPrepStmts()));
 
-		// CRITICAL: MySQL batch optimization properties
-		config.addDataSourceProperty("rewriteBatchedStatements", "true");
-		config.addDataSourceProperty("useMultiQueries", "true");
-		config.addDataSourceProperty("allowMultiQueries", "true");
-		config.addDataSourceProperty("useLocalSessionState", "true");
-		config.addDataSourceProperty("useLocalTransactionState", "true");
+		// CRITICAL: MySQL batch optimization properties from YAML
+		config.addDataSourceProperty("rewriteBatchedStatements", String.valueOf(writeConnProps.getRewriteBatchedStatements()));
+		config.addDataSourceProperty("useMultiQueries", String.valueOf(writeConnProps.getUseMultiQueries()));
+		config.addDataSourceProperty("allowMultiQueries", String.valueOf(writeConnProps.getAllowMultiQueries()));
+		config.addDataSourceProperty("useLocalSessionState", String.valueOf(writeConnProps.getUseLocalSessionState()));
+		config.addDataSourceProperty("useLocalTransactionState", String.valueOf(writeConnProps.getUseLocalTransactionState()));
 
 		config.setPoolName("WritePool");
 
@@ -110,23 +119,27 @@ public class DatabaseConfig {
 				awsSecrets.getDatabaseReadDatabase()));
 		config.setUsername(awsSecrets.getDatabaseReadUsername());
 		config.setPassword(awsSecrets.getDatabaseReadPassword());
-		config.setDriverClassName(DRIVER_CLASS_NAME);
+		config.setDriverClassName(dataSourceProperties.getDriverClassName());
 
-		// Read-optimized connection pool settings (larger pool for read operations)
-		config.setMaximumPoolSize(100);
-		config.setMinimumIdle(20);
-		config.setIdleTimeout(600000); // 10 minutes
-		config.setMaxLifetime(1800000); // 30 minutes
-		config.setConnectionTimeout(10000); // 10 seconds
-		config.setLeakDetectionThreshold(60000); // 1 minute
-		config.setValidationTimeout(3000); // 3 seconds
+		// Get environment-specific connection pool settings from YAML
+		DataSourceProperties.PoolConfig readConfig = dataSourceProperties.getReadHikariConfig();
+		DataSourceProperties.ConnectionProperties readConnProps = readConfig.getConnectionProperties();
+		
+		// Apply YAML-configured connection pool settings
+		config.setMaximumPoolSize(readConfig.getMaximumPoolSize());
+		config.setMinimumIdle(readConfig.getMinimumIdle());
+		config.setIdleTimeout(readConfig.getIdleTimeout());
+		config.setMaxLifetime(readConfig.getMaxLifetime());
+		config.setConnectionTimeout(readConfig.getConnectionTimeout());
+		config.setLeakDetectionThreshold(readConfig.getLeakDetectionThreshold());
+		config.setValidationTimeout(readConfig.getValidationTimeout());
 		config.setAutoCommit(true); // Read-only can use autocommit
 
-		// Read-specific optimizations
-		config.addDataSourceProperty("cachePrepStmts", "true");
-		config.addDataSourceProperty("prepStmtCacheSize", "500");
-		config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-		config.addDataSourceProperty("useServerPrepStmts", "true");
+		// Read-specific optimizations from YAML configuration
+		config.addDataSourceProperty("cachePrepStmts", String.valueOf(readConnProps.getCachePrepStmts()));
+		config.addDataSourceProperty("prepStmtCacheSize", String.valueOf(readConnProps.getPrepStmtCacheSize()));
+		config.addDataSourceProperty("prepStmtCacheSqlLimit", String.valueOf(readConnProps.getPrepStmtCacheSqlLimit()));
+		config.addDataSourceProperty("useServerPrepStmts", String.valueOf(readConnProps.getUseServerPrepStmts()));
 		config.setReadOnly(true); // Mark as read-only
 
 		config.setPoolName("ReadPool");
@@ -179,30 +192,33 @@ public class DatabaseConfig {
 		HibernateJpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
 		factory.setJpaVendorAdapter(vendorAdapter);
 
+		// Get environment-specific JPA configuration from YAML
+		DataSourceProperties.JpaConfig jpaConfig = dataSourceProperties.getJpaConfig();
+
 		Map<String, Object> properties = new HashMap<>();
-		properties.put("hibernate.hbm2ddl.auto", "none");
-		properties.put("hibernate.dialect", "org.hibernate.dialect.MySQL8Dialect");
-		properties.put("hibernate.show_sql", false);
-		properties.put("hibernate.format_sql", true);
-		properties.put("hibernate.use_sql_comments", true);
+		properties.put("hibernate.hbm2ddl.auto", jpaConfig.getDdlAuto());
+		properties.put("hibernate.dialect", jpaConfig.getDialect());
+		properties.put("hibernate.show_sql", jpaConfig.getShowSql());
+		properties.put("hibernate.format_sql", jpaConfig.getFormatSql());
+		properties.put("hibernate.use_sql_comments", jpaConfig.getUseSqlComments());
 
 		// =============================================================================
-		// MYSQL BATCH OPTIMIZATION - STABLE CONFIGURATION
+		// MYSQL BATCH OPTIMIZATION - ENVIRONMENT-SPECIFIC CONFIGURATION
 		// =============================================================================
-		properties.put("hibernate.jdbc.batch_size", 50);
-		properties.put("hibernate.order_inserts", true);
-		properties.put("hibernate.order_updates", true);
-		properties.put("hibernate.jdbc.batch_versioned_data", true);
+		properties.put("hibernate.jdbc.batch_size", jpaConfig.getBatchSize());
+		properties.put("hibernate.order_inserts", jpaConfig.getOrderInserts());
+		properties.put("hibernate.order_updates", jpaConfig.getOrderUpdates());
+		properties.put("hibernate.jdbc.batch_versioned_data", jpaConfig.getBatchVersionedData());
 
-		// MySQL IDENTITY optimizations
-		properties.put("hibernate.id.new_generator_mappings", true);
-		properties.put("hibernate.jdbc.use_get_generated_keys", true);
+		// MySQL IDENTITY optimizations from YAML
+		properties.put("hibernate.id.new_generator_mappings", jpaConfig.getNewGeneratorMappings());
+		properties.put("hibernate.jdbc.use_get_generated_keys", jpaConfig.getUseGetGeneratedKeys());
 
-		// Enhanced batch fetch configuration
-		properties.put("hibernate.default_batch_fetch_size", 16);
-		properties.put("hibernate.jdbc.lob.non_contextual_creation", true);
+		// Enhanced batch fetch configuration from YAML
+		properties.put("hibernate.default_batch_fetch_size", jpaConfig.getDefaultBatchFetchSize());
+		properties.put("hibernate.jdbc.lob.non_contextual_creation", jpaConfig.getLobNonContextualCreation());
 
-		properties.put("hibernate.generate_statistics", false);
+		properties.put("hibernate.generate_statistics", jpaConfig.getGenerateStatistics());
 
 		factory.setJpaPropertyMap(properties);
 

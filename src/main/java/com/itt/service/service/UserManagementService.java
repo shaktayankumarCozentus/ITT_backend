@@ -1,15 +1,11 @@
 package com.itt.service.service;
 
 import java.util.List;
-import java.util.Map;
 
 import com.itt.service.dto.CurrentUserDto;
 import com.itt.service.dto.PaginationResponse;
 import com.itt.service.dto.user_management.AccessAssignmentRequestDto;
-import com.itt.service.dto.user_management.AccessSummaryResponseDto;
-import com.itt.service.dto.user_management.AssignedCompanyDto;
-import com.itt.service.dto.user_management.ChildCompaniesRequestDto;
-import com.itt.service.dto.user_management.CompanyDto;
+import com.itt.service.dto.user_management.AssignedCompaniesResponseDto;
 import com.itt.service.dto.user_management.CompanyTreeNode;
 import com.itt.service.dto.user_management.CompanyTreeRequestDto;
 import com.itt.service.dto.user_management.CompanyTreeResponseDto;
@@ -19,7 +15,6 @@ import com.itt.service.dto.user_management.SearchCompanyRequestDto;
 import com.itt.service.dto.user_management.SearchForCopyRequestDto;
 import com.itt.service.dto.user_management.SearchUsersRequestDto;
 import com.itt.service.dto.user_management.SearchUsersResponseDto;
-import com.itt.service.dto.user_management.TopLevelCompaniesRequestDto;
 import com.itt.service.dto.user_management.UserCompanyDto;
 import com.itt.service.dto.user_management.UserCountResponseDto;
 
@@ -39,13 +34,7 @@ public interface UserManagementService {
 
 	String copyUserAccess(CurrentUserDto user, CopyAccessRequestDto request);
 
-	List<CompanyDto> getTopLevelCompanies(CurrentUserDto user, TopLevelCompaniesRequestDto request);
-
-	Map<String, List<CompanyDto>> getChildCompanies(CurrentUserDto user, ChildCompaniesRequestDto request);
-
-	List<AssignedCompanyDto> getAssignedCompanies(CurrentUserDto user, String userId);
-
-	AccessSummaryResponseDto getAccessSummary(CurrentUserDto user, String userId);
+	AssignedCompaniesResponseDto getAssignedCompanies(CurrentUserDto user, String userId);
 
 	CompanyTreeResponseDto buildCompanyTree(CompanyTreeRequestDto request);
 

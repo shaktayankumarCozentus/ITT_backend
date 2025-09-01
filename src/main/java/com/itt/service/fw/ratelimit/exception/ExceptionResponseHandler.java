@@ -4,96 +4,93 @@ import com.fasterxml.jackson.databind.JsonMappingException.Reference;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
-import com.itt.service.fw.ratelimit.dto.response.ExceptionResponseDto;
+import com.itt.service.dto.ApiResponse;
+import com.itt.service.enums.ErrorCode;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
+import org.springframework.core.annotation.Order;
 
 @Slf4j
-@ControllerAdvice(basePackages = "com.itt.service.**")
+@ControllerAdvice(basePackages = "com.itt.service.fw.ratelimit.**") // ← RESTRICTED to rate limiting only
+@Order(2) // ← Lower priority than GlobalExceptionHandler (@Order(1))
 @Hidden
-public class ExceptionResponseHandler extends ResponseEntityExceptionHandler {
+public class ExceptionResponseHandler {
 	
 	private static final String NOT_READABLE_REQUEST_ERROR_MESSAGE = "The request is malformed. Ensure the JSON structure is correct.";
 	
 	@ResponseBody
 	@ExceptionHandler(ResponseStatusException.class)
-	public ResponseEntity<ExceptionResponseDto<String>> responseStatusExceptionHandler(final ResponseStatusException exception) {
+	public ResponseEntity<ApiResponse<Void>> responseStatusExceptionHandler(final ResponseStatusException exception) {
 		logException(exception);
-		final var exceptionResponse = new ExceptionResponseDto<String>();
-		exceptionResponse.setStatus(exception.getStatusCode().toString());
-		exceptionResponse.setDescription(exception.getReason());
-		return ResponseEntity.status(exception.getStatusCode()).body(exceptionResponse);
-	}
-
-	@Override
-	protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
-			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-		logException(exception);
-		final var fieldErrors = exception.getBindingResult().getFieldErrors();
-		final var description = fieldErrors.stream().map(fieldError -> fieldError.getDefaultMessage()).collect(Collectors.toList());
 		
-		final var exceptionResponse = new ExceptionResponseDto<List<String>>();
-		exceptionResponse.setStatus(HttpStatus.BAD_REQUEST.toString());
-		exceptionResponse.setDescription(description);
-
-		return ResponseEntity.badRequest().body(exceptionResponse);
+		ApiResponse<Void> response = ApiResponse.<Void>builder()
+				.success(false)
+				.errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
+				.message(exception.getReason())
+				.build();
+				
+		return ResponseEntity.status(exception.getStatusCode()).body(response);
 	}
+
+
 	
-	@Override
-	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException exception,
-			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+	@ResponseBody
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(HttpMessageNotReadableException exception) {
 		logException(exception);
-		final var exceptionResponse = new ExceptionResponseDto<AtomicReference<String>>();
-		exceptionResponse.setStatus(HttpStatus.BAD_REQUEST.toString());
-		final var description = new AtomicReference<String>(NOT_READABLE_REQUEST_ERROR_MESSAGE);
+		
+		String message = NOT_READABLE_REQUEST_ERROR_MESSAGE;
 
 		if (exception.getCause() instanceof InvalidFormatException invalidFormatException) {
-			invalidFormatException.getPath().stream().map(Reference::getFieldName).findFirst().ifPresent(fieldName -> {
-				final var invalidValue = invalidFormatException.getValue();
-				final var errorMessage = String.format("Invalid value '%s' for '%s'.", invalidValue, fieldName);
-				description.set(errorMessage);
-			});
+			message = invalidFormatException.getPath().stream()
+					.map(Reference::getFieldName)
+					.findFirst()
+					.map(fieldName -> String.format("Invalid value '%s' for '%s'.", 
+								invalidFormatException.getValue(), fieldName))
+					.orElse(message);
 		} else if (exception.getCause() instanceof UnrecognizedPropertyException unrecognizedPropertyException) {
-			unrecognizedPropertyException.getPath().stream().map(Reference::getFieldName).findFirst().ifPresent(fieldName -> {
-				final var errorMessage = String.format("Unrecognized property '%s' detected.", fieldName);
-				description.set(errorMessage);
-			});
+			message = unrecognizedPropertyException.getPath().stream()
+					.map(Reference::getFieldName)
+					.findFirst()
+					.map(fieldName -> String.format("Unrecognized property '%s' detected.", fieldName))
+					.orElse(message);
 		} else if (exception.getCause() instanceof MismatchedInputException mismatchedInputException) {
-			mismatchedInputException.getPath().stream().map(Reference::getFieldName).findFirst().ifPresent(fieldName -> {
-				final var errorMessage = String.format("Invalid data type for field '%s'.", fieldName);
-				description.set(errorMessage);
-			});
+			message = mismatchedInputException.getPath().stream()
+					.map(Reference::getFieldName)
+					.findFirst()
+					.map(fieldName -> String.format("Invalid data type for field '%s'.", fieldName))
+					.orElse(message);
 		}
 
-		exceptionResponse.setDescription(description);
-		return ResponseEntity.badRequest().body(exceptionResponse);
+		ApiResponse<Void> response = ApiResponse.<Void>builder()
+				.success(false)
+				.errorCode(ErrorCode.INVALID_DATA_FORMAT.getCode())
+				.message(message)
+				.build();
+				
+		return ResponseEntity.badRequest().body(response);
 	}
 
 	@ResponseBody
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<?> serverExceptionHandler(final Exception exception) {
+	public ResponseEntity<ApiResponse<Void>> serverExceptionHandler(final Exception exception) {
 		logException(exception);
-		final var exceptionResponse = new ExceptionResponseDto<String>();
-		exceptionResponse.setStatus(HttpStatus.NOT_IMPLEMENTED.toString());
-		exceptionResponse.setDescription("Something went wrong.");
-		return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(exceptionResponse);
+		
+		ApiResponse<Void> response = ApiResponse.<Void>builder()
+				.success(false)
+				.errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
+				.message("Something went wrong.")
+				.build();
+				
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 	}
 	
 	private void logException(final @NonNull Exception exception) {

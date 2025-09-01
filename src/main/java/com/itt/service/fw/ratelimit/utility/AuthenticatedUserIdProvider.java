@@ -4,6 +4,8 @@ import com.itt.service.fw.ratelimit.filter.JwtAuthenticationFilter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -25,7 +27,7 @@ public class AuthenticatedUserIdProvider {
 	 * context.
 	 * 
 	 * @return Unique ID (UUID formatted) corresponding to the authenticated user.
-	 * @throws IllegalStateException if the method is invoked when a request was
+	 * @throws CustomException if the method is invoked when a request was
 	 *                               destined to a public API endpoint and did not pass
 	 *                               the JwtAuthenticationFilter
 	 */
@@ -34,7 +36,7 @@ public class AuthenticatedUserIdProvider {
 		        .map(Authentication::getPrincipal)
 		        .filter(UUID.class::isInstance)
 		        .map(UUID.class::cast)
-		        .orElseThrow(IllegalStateException::new);
+		        .orElseThrow(() -> new CustomException(ErrorCode.UNAUTHORIZED, "Authentication context not available or invalid user ID"));
 	}
 	
 	/**

@@ -9,6 +9,7 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 import java.util.Map;
@@ -32,6 +33,7 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SaveRoleRequestValidator implements ConstraintValidator<SaveRoleRequestConstraint, SaveRoleRequest> {
     
     private final MasterConfigRepository masterConfigRepository;
@@ -50,11 +52,17 @@ public class SaveRoleRequestValidator implements ConstraintValidator<SaveRoleReq
 
     @Override
     public boolean isValid(SaveRoleRequest req, ConstraintValidatorContext context) {
+        log.error("🔵 DEBUG: SaveRoleRequestValidator.isValid() called!");
+        log.error("🔵 DEBUG: Request: {}", req);
+        log.error("🔵 DEBUG: Role name: {}", req != null ? req.getName() : "null");
+        
         context.disableDefaultConstraintViolation();
         
         // Fast fail: Basic validation with early return
         var basicErrors = validateBasicFields(req);
         if (!basicErrors.isEmpty()) {
+            log.error("🔵 DEBUG: Basic validation failed with {} errors", basicErrors.size());
+            basicErrors.forEach(error -> log.error("🔵 DEBUG: Basic error - {}: {}", error.property(), error.message()));
             buildConstraintViolations(basicErrors, context);
             return false;
         }
@@ -62,10 +70,13 @@ public class SaveRoleRequestValidator implements ConstraintValidator<SaveRoleReq
         // Single optimized database validation
         var dbErrors = validateDatabase(req);
         if (!dbErrors.isEmpty()) {
+            log.error("🔵 DEBUG: Database validation failed with {} errors", dbErrors.size());
+            dbErrors.forEach(error -> log.error("🔵 DEBUG: DB error - {}: {}", error.property(), error.message()));
             buildConstraintViolations(dbErrors, context);
             return false;
         }
         
+        log.error("🔵 DEBUG: Validation passed successfully");
         return true;
     }
     

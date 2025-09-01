@@ -26,34 +26,33 @@ import org.springframework.util.StringUtils;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.itt.service.annotation.ReadOnlyDataSource;
-import com.itt.service.config.search.UserSearchConfig;
 import com.itt.service.config.search.UserCompanySearchConfig;
+import com.itt.service.config.search.UserSearchConfig;
 import com.itt.service.dto.CurrentUserDto;
 import com.itt.service.dto.DataTableRequest;
 import com.itt.service.dto.PaginationResponse;
 import com.itt.service.dto.user_management.AccessAssignmentRequestDto;
-import com.itt.service.dto.user_management.AccessSummaryResponseDto;
+import com.itt.service.dto.user_management.AssignedCompaniesResponseDto;
 import com.itt.service.dto.user_management.AssignedCompanyDto;
-import com.itt.service.dto.user_management.ChildCompaniesRequestDto;
-import com.itt.service.dto.user_management.CompanyDto;
 import com.itt.service.dto.user_management.CompanyDtoPOc;
 import com.itt.service.dto.user_management.CompanyTreeNode;
 import com.itt.service.dto.user_management.CompanyTreeRequestDto;
 import com.itt.service.dto.user_management.CompanyTreeResponseDto;
 import com.itt.service.dto.user_management.CopyAccessRequestDto;
-
 import com.itt.service.dto.user_management.RoleDto;
 import com.itt.service.dto.user_management.SearchCompanyRequestDto;
 import com.itt.service.dto.user_management.SearchForCopyRequestDto;
 import com.itt.service.dto.user_management.SearchUsersRequestDto;
+import com.itt.service.dto.user_management.SearchUsersRequestDto.UserRoleFilter;
 import com.itt.service.dto.user_management.SearchUsersResponseDto;
-import com.itt.service.dto.user_management.TopLevelCompaniesRequestDto;
 import com.itt.service.dto.user_management.UserCompanyDto;
 import com.itt.service.dto.user_management.UserCountResponseDto;
 import com.itt.service.entity.MapUserCompany;
 import com.itt.service.entity.MasterCompany;
 import com.itt.service.entity.MasterUser;
 import com.itt.service.entity.Role;
+import com.itt.service.enums.ErrorCode;
+import com.itt.service.exception.CustomException;
 import com.itt.service.fw.search.DynamicSearchQueryBuilder;
 import com.itt.service.fw.search.SearchableEntity;
 import com.itt.service.fw.search.UniversalSortFieldValidator;
@@ -119,18 +118,24 @@ public class UserManagementServiceImpl implements UserManagementService {
 		// 3. Set entity-specific sort validator for security
 		dt.setSortFieldValidator(new EntitySpecificSortValidator(userSearchConfig, universalSortValidator));
 
-		// 4. Apply active role filter if specified
-		if (request.getIsActiveRole() != null) {
-			// Add custom filter for active role using equality operator
-			DataTableRequest.Column roleFilter = new DataTableRequest.Column();
-			roleFilter.setColumnName("assignedRole.isActive");
-			// Use "eq:" operator for integer field comparison (not string contains)
-			roleFilter.setFilter("eq:" + (request.getIsActiveRole() ? "1" : "0"));
-			dt.getColumns().add(roleFilter);
+		// 4. Apply role filter if specified - handle new business logic
+		if (request.getUserRoleFilter() != null) {
+			if (request.getUserRoleFilter() == UserRoleFilter.ACTIVE_OR_NO_ROLE) {
+				// Use special filter that will be handled by UserSearchConfig
+				DataTableRequest.Column roleFilter = new DataTableRequest.Column();
+				roleFilter.setColumnName("assignedRole.isActive");
+				roleFilter.setFilter("activeOrNoRole:1");
+				dt.getColumns().add(roleFilter);
+			} else if (request.getUserRoleFilter() == UserRoleFilter.INACTIVE_ROLE) {
+				// Users with inactive role only (uses INNER JOIN)
+				DataTableRequest.Column roleFilter = new DataTableRequest.Column();
+				roleFilter.setColumnName("assignedRole.isActive");
+				roleFilter.setFilter("eq:0");
+				dt.getColumns().add(roleFilter);
+			}
 		}
 
 		// 5. Execute dynamic search using Universal Search Framework
-		// Company name search now uses EXISTS subquery automatically for performance
 		Page<MasterUser> page = queryBuilder.findWithDynamicSearch(userSearchConfig, dt);
 
 		// 6. PERFORMANCE OPTIMIZATION: Batch fetch company counts for all users in
@@ -251,10 +256,16 @@ public class UserManagementServiceImpl implements UserManagementService {
 	public UserCountResponseDto getUserCount(CurrentUserDto user, String type) {
 
 		long count;
-		if ("active".equalsIgnoreCase(type)) {
-			count = userRepo.count(UserSpecification.hasActiveRole());
-		} else {
+		// Handle both old and new type values for backward compatibility
+		if ("active".equalsIgnoreCase(type) || "activeOrNoRole".equalsIgnoreCase(type)) {
+			// New logic: Count users with active role OR no role
+			count = userRepo.count(UserSpecification.hasActiveRoleOrNoRole());
+		} else if ("inactive".equalsIgnoreCase(type) || "inactiveRole".equalsIgnoreCase(type)) {
+			// Count users with inactive role only
 			count = userRepo.count(UserSpecification.hasInactiveRole());
+		} else {
+			// Fallback for old "active" vs others
+			count = userRepo.count(UserSpecification.hasActiveRole());
 		}
 
 		return new UserCountResponseDto(count);
@@ -414,34 +425,43 @@ public class UserManagementServiceImpl implements UserManagementService {
 	}
 
 	@Override
-	public List<CompanyDto> getTopLevelCompanies(CurrentUserDto user, TopLevelCompaniesRequestDto request) {
-		return null;
+	public AssignedCompaniesResponseDto getAssignedCompanies(CurrentUserDto user, String userId) {
+	    Integer uid = Integer.valueOf(userId);
+	    List<MasterCompany> companies = userRepo.findAssignedCompanies(uid);
+
+	    // Partition: PSA (true) vs Non-PSA (false)
+	    Map<Boolean, List<MasterCompany>> partitions = companies.stream()
+	        .collect(Collectors.partitioningBy(this::isPsa));
+
+	    List<AssignedCompanyDto> psa = partitions.get(true).stream()
+	            .map(this::toDto)
+	            .toList();
+
+	    List<AssignedCompanyDto> nonPsa = partitions.get(false).stream()
+	            .map(this::toDto)
+	            .toList();
+
+	    return AssignedCompaniesResponseDto.builder()
+	            .psaCompanies(psa)
+	            .nonPsaCompanies(nonPsa)
+	            .build();
 	}
 
-	@Override
-	public Map<String, List<CompanyDto>> getChildCompanies(CurrentUserDto user, ChildCompaniesRequestDto request) {
-		return null;
+	/** PSA if psa_flag == 1; treat null/others as non-PSA */
+	private boolean isPsa(MasterCompany mc) {
+	    Integer flag = mc.getPsaFlag();
+	    return flag != null && flag == 1;
 	}
 
-	@Override
-	public List<AssignedCompanyDto> getAssignedCompanies(CurrentUserDto user, String userId) {
-
-		Integer uid = Integer.valueOf(userId);
-		List<MasterCompany> companies = userRepo.findAssignedCompanies(uid);
-
-		return companies.stream().map(this::toDto).toList();
+	/** Map entity → leaf DTO */
+	private AssignedCompanyDto toDto(MasterCompany mc) {
+	    return AssignedCompanyDto.builder()
+	            .companyCode(mc.getId())
+	            .companyName(mc.getCompanyName())
+	            .build();
 	}
 
-	private AssignedCompanyDto toDto(MasterCompany c) {
-		return AssignedCompanyDto.builder()
-				// assuming companyCode is Integer; convert to String if needed
-				.companyCode(String.valueOf(c.getOriginalCompanyId())).companyName(c.getCompanyName()).build();
-	}
 
-	@Override
-	public AccessSummaryResponseDto getAccessSummary(CurrentUserDto user, String userId) {
-		return null;
-	}
 
 	/**
 	 * Two separate caches keyed by "PSA" / "NON-PSA", each holds the full list of
@@ -597,7 +617,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 		// 1. Authorization check - ensure user can access this data
 		// You can add specific authorization logic here based on your requirements
 		if (user == null) {
-			throw new IllegalArgumentException("User authentication required");
+			throw new CustomException(ErrorCode.UNAUTHORIZED, "User authentication required");
 		}
 		
 		// 2. Register entity for sort validation

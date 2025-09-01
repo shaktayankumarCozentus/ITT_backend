@@ -4,6 +4,8 @@ import com.itt.service.fw.lit.cache.CacheProperties;
 import com.itt.service.fw.lit.service.LitCacheAdapter;
 import com.itt.service.fw.lit.service.impl.InMemoryLitCacheAdapter;
 import com.itt.service.fw.lit.service.impl.RedisLitCacheAdapter;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +24,7 @@ public class LitCacheConfiguration {
         return switch (props.type().name().toLowerCase()) {
             case "redis" -> new RedisLitCacheAdapter(redisTemplate, props);
             case "memory" -> new InMemoryLitCacheAdapter();
-            default -> throw new IllegalArgumentException("Unknown lit.cache.type: " + props.type());
+            default -> throw new CustomException(ErrorCode.INVALID_DATA_FORMAT, "Unknown lit.cache.type: " + props.type());
         };
     }
 }

@@ -6,6 +6,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.support.ResourcePropertySource;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 
 public class DefaultLoggingEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
@@ -15,7 +17,7 @@ public class DefaultLoggingEnvironmentPostProcessor implements EnvironmentPostPr
             PropertySource<?> defaultProps = new ResourcePropertySource("classpath:application-default.yml");
             environment.getPropertySources().addLast(defaultProps);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to load default logging properties from application-default.yml", e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to load default logging properties from application-default.yml", e);
         }
     }
 

@@ -109,7 +109,7 @@ public class ValidationException extends CustomException {
     public ValidationException(String userMessage, List<ValidationError> validationErrors) {
         super(ErrorCode.VALIDATION_FAILED, userMessage);
         if (validationErrors == null || validationErrors.isEmpty()) {
-            throw new IllegalArgumentException("Validation errors list cannot be null or empty");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "Validation errors list cannot be null or empty");
         }
         this.validationErrors = validationErrors;
     }
@@ -129,7 +129,7 @@ public class ValidationException extends CustomException {
     public ValidationException(ErrorCode errorCode, String userMessage, List<ValidationError> validationErrors) {
         super(errorCode, userMessage);
         if (validationErrors == null || validationErrors.isEmpty()) {
-            throw new IllegalArgumentException("Validation errors list cannot be null or empty");
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "Validation errors list cannot be null or empty");
         }
         this.validationErrors = validationErrors;
     }

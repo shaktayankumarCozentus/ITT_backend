@@ -66,7 +66,7 @@ public class NoSecurityConfiguration {
 	 * ✅ All available roles in the system. Mock user is granted ALL roles for
 	 * development convenience.
 	 */
-	private static final Set<String> ALL_ROLES = Set.of( "ROLE_ROLE_MANAGEMENT_VIEW","ROLE_ROLE_MANAGEMENT_EDIT",
+	private static final Set<String> ALL_ROLES = Set.of("ROLE_HOME_PAGE_VIEW", "ROLE_ROLE_MANAGEMENT_VIEW","ROLE_ROLE_MANAGEMENT_EDIT",
 			"ROLE_USER_MANAGEMENT_VIEW", "ROLE_USER_MANAGEMENT_EDIT", "ROLE_MASTER_DATA_VIEW",
 			"ROLE_SUBSCRIPTION_MANAGEMENT_VIEW", "ROLE_SUBSCRIPTION_MANAGEMENT_EDIT", "ROLE_PETA_PETD_MANAGEMENT_VIEW",
 			"ROLE_PETA_PETD_MANAGEMENT_EDIT", "ROLE_LIT_VIEW", "ROLE_LIT_EDIT");

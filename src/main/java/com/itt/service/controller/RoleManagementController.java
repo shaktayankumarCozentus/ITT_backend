@@ -14,7 +14,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -113,8 +112,7 @@ public class RoleManagementController implements RoleManagementDocumentation {
         req.setCreatedById(currentUser.getUserId());
         req.setUpdatedById(currentUser.getUserId());
         var dto = managementService.saveOrUpdateFull(req);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ResponseBuilder.success(dto));
+        return ResponseBuilder.created("Role created successfully", dto);
     } 
 
     /**
@@ -130,6 +128,6 @@ public class RoleManagementController implements RoleManagementDocumentation {
         req.setId(roleId);
         req.setUpdatedById(currentUser.getUserId());
         var dto = managementService.saveOrUpdateFull(req);
-        return ResponseBuilder.success(dto);
+        return ResponseBuilder.success("Role updated successfully", dto);
     }
 }

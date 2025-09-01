@@ -14,6 +14,8 @@ import com.itt.service.fw.search.SearchableEntity;
 import com.itt.service.fw.search.UniversalSortFieldValidator;
 import com.itt.service.repository.*;
 import com.itt.service.service.RoleManagementService;
+import com.itt.service.exception.CustomException;
+import com.itt.service.enums.ErrorCode;
 import com.itt.service.validator.SortFieldValidator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
@@ -442,7 +444,7 @@ public class RoleManagementServiceImpl implements RoleManagementService {
                                         .createdOn(LocalDateTime.now())
                                         .createdById(req.getCreatedById()) // Use actual user ID from request
                                         .build();
-                        default -> throw new IllegalStateException("Unexpected operation type");
+                        default -> throw new CustomException(ErrorCode.INVALID_REQUEST, "Unexpected operation type");
                 };
 
                 // Optimized: Method chaining with null-safe operations

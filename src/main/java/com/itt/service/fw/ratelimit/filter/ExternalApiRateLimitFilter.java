@@ -137,8 +137,6 @@ public class ExternalApiRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         
-        log.debug("🔍 Applying external API rate limiting for request: {} {}", requestMethod, requestPath);
-        
         try {
             // Extract API key or authentication credential from request
             String authenticationCredential = extractAuthenticationCredential(request);
