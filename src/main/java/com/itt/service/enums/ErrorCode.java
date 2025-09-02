@@ -22,7 +22,8 @@ public enum ErrorCode {
     INVALID_EMAIL_FORMAT("VAL_005", HttpStatus.BAD_REQUEST),
     INVALID_PHONE_FORMAT("VAL_006", HttpStatus.BAD_REQUEST),
     PASSWORD_TOO_WEAK("VAL_007", HttpStatus.BAD_REQUEST),
-    
+    INVALID_DATE_FORMAT("VAL_008", HttpStatus.BAD_REQUEST),
+
     // Authentication Errors
     INVALID_CREDENTIALS("AUTH_001", HttpStatus.UNAUTHORIZED),
     TOKEN_EXPIRED("AUTH_002", HttpStatus.UNAUTHORIZED),
