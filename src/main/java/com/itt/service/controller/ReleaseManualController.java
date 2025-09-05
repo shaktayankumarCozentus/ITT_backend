@@ -1,6 +1,7 @@
 package com.itt.service.controller;
 
 
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -61,17 +62,18 @@ public class ReleaseManualController {
 	    // ResponseBuilder.dynamicResponse will return 204 if documentUrl is empty, else 200 with ApiResponse
 	    return ResponseBuilder.dynamicResponse(documentUrl);
 	}
- 
 
-	@PostMapping(value = "/upload", produces = MediaType.APPLICATION_JSON_VALUE)
+	@Operation(summary = "Document uploading", description = "API for uploading a PDF document")
+	@PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE , produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<ApiResponse<ReleaseManualNotesDTO>> releaseNotesUpload(
-	        @RequestParam MultipartFile file,
+	        @RequestParam("file") MultipartFile file,
 	        @RequestParam String docType,
+	        @RequestParam String releaseUserManualName,
 	        @RequestParam String releaseDate) {
 
 		try {
 			ApiResponse<ReleaseManualNotesDTO> response =
-					releaseNotesService.releaseNotesUpload(file, "release-documents", docType, releaseDate);
+					releaseNotesService.releaseNotesUpload(file, releaseUserManualName, docType, releaseDate);
 
 			return ResponseEntity.status(HttpStatus.OK).body(response);
 
@@ -82,9 +84,42 @@ public class ReleaseManualController {
 		}
 	}
 
+	@Operation(summary = "Document re-uploading", description = "API for re-uploading a PDF document based on ID")
+	@PutMapping(value = "/{id}/re-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<ApiResponse<ReleaseManualNotesDTO>> reUploadReleaseNotes(
+			@PathVariable("id") Integer id,
+			@RequestParam("file") MultipartFile file) {
 
-	
-	
-	
+		try {
+			ApiResponse<ReleaseManualNotesDTO> response =
+					releaseNotesService.reUploadReleaseNotes(id, file);
+
+			return ResponseEntity.ok(response);
+
+		} catch (Exception e) {
+			log.error("Error occurred during document re-upload for id={}", id, e);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(ApiResponse.error(ErrorCode.INTERNAL_ERROR, "Unexpected error during re-upload"));
+		}
+	}
+
+
+	@Operation(summary = "Delete release note", description = "API for deleting a release note by ID and docType")
+	@DeleteMapping(value = "/{id}/{docType}", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<ApiResponse<Void>> deleteReleaseNoteByIdAndDocType(
+			@PathVariable("id") Integer id,
+			@PathVariable("docType") String docType) {
+
+		log.info("Deleting release note for id={} and docType={}", id, docType);
+
+		try {
+			ApiResponse<Void> response = releaseNotesService.deleteReleaseNoteByIdAndDocType(id, docType);
+			return ResponseEntity.ok(response);
+		} catch (Exception e) {
+			log.error("Error occurred while deleting release note for id={} and docType={}", id, docType, e);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(ApiResponse.error(ErrorCode.INTERNAL_ERROR, "Unexpected error during delete"));
+		}
+	}
 
 }

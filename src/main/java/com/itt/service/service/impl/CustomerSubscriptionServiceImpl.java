@@ -1,11 +1,15 @@
 package com.itt.service.service.impl;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +22,7 @@ import com.itt.service.constants.ErrorMessages;
 import com.itt.service.constants.SuccessMessages;
 import com.itt.service.dto.CompanyRequestDTO;
 import com.itt.service.dto.DataTableRequest;
+import com.itt.service.dto.DataTableRequest.Column;
 import com.itt.service.dto.PaginationResponse;
 import com.itt.service.dto.customer_subscription.CompanyDTO;
 import com.itt.service.dto.customer_subscription.CustomerSubscriptionDTO;
@@ -45,6 +50,7 @@ import jakarta.persistence.PersistenceContext;
 @Service
 public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, Integer, CustomerSubscriptionDTO>
 		implements CustomerSubscriptionService {
+
 	private final MasterCompanyRepository masterRepository;
 	private final MapCompanySubscriptionRepository mapRepository;
 	private final MasterDataService masterDataService;
@@ -88,6 +94,9 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 
 	@Override
 	public PaginationResponse<CustomerSubscriptionDTO> findAllWithFeatures(DataTableRequest request) {
+		List<Column> columns = new ArrayList<>(ObjectUtils.defaultIfNull(request.getColumns(), List.of()));
+		columns.add(new Column("subscriptionTypeConfigId", "notnull:", null));
+		request.setColumns(columns);
 		// Fetch all companies using Universal Search Framework
 		PaginationResponse<CustomerSubscriptionDTO> response = super.search(request);
 		// Fetch features for each company
@@ -124,6 +133,7 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 	@Transactional(rollbackFor = Exception.class)
 	public String bulkUpdateSubscriptionTier(SubscriptionBulkUpdateRequest request) {
 		try {
+			validateSubscriptionType(request.getSubscriptionTierType());
 			Boolean isSent = domainSyncService.sendBulkCustomerSubscriptionUpdateToDomains(request);
 			if (isSent == null || !isSent) {
 				throw new CustomException(ErrorCode.EXTERNAL_SERVICE_UNAVAILABLE,
@@ -131,8 +141,11 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 			}
 			Integer noOfRowsAffected;
 			if (Boolean.TRUE.equals(request.getIsAllSelected())) {
-				noOfRowsAffected = masterRepository.updateSubscriptionTypeForAllCompanies(request.getSubscriptionTierType());
+				mapRepository.deleteAll();
+				noOfRowsAffected = masterRepository
+						.updateSubscriptionTypeForAllCompanies(request.getSubscriptionTierType());
 			} else {
+				mapRepository.deleteByCompanyIdIn(request.getCompanyCodes());
 				noOfRowsAffected = masterRepository.updateSubscriptionTypeByCompanyCodes(
 						request.getSubscriptionTierType(), request.getCompanyCodes());
 			}
@@ -148,6 +161,14 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 	@Transactional(rollbackFor = Exception.class)
 	public String updateCustomerSubscription(SubscriptionUpdateRequest request) {
 		try {
+			MasterConfigDTO config = validateSubscriptionType(request.getSubscriptionTierType());
+			if (config.getKeyCode().equals("STANDARD") && !CollectionUtils.isEmpty(request.getFeatureIds())) {
+				throw new CustomException(ErrorCode.INVALID_REQUEST,
+						ErrorMessages.STANDARD_SUBSCRIPTION_FEATURES_NOT_CONFIGURABLE);
+			} else if (config.getKeyCode().equals("PREMIUM") && CollectionUtils.isEmpty(request.getFeatureIds())) {
+				throw new CustomException(ErrorCode.INVALID_REQUEST,
+						ErrorMessages.PREMIUM_SUBSCRIPTION_REQUIRES_FEATURES);
+			}
 			Boolean isSent = domainSyncService.sendCustomerSubscriptionUpdateToDomains(request);
 			if (isSent == null || !isSent) {
 				throw new CustomException(ErrorCode.EXTERNAL_SERVICE_UNAVAILABLE,
@@ -165,6 +186,8 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 				mapRepository.saveAll(features);
 			}
 			return String.format(SuccessMessages.SUBSCRIPTION_UPDATE_SUCCESSFUL, company.getCompanyName());
+		} catch (CustomException ce) {
+			throw ce;
 		} catch (Exception e) {
 			throw new CustomException(ErrorCode.DATABASE_CONNECTION_ERROR, ErrorMessages.SUBSCRIPTION_UPDATE_FAILURE,
 					e);
@@ -175,13 +198,32 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 	@Transactional(rollbackFor = Exception.class)
 	public String copyCustomerSubscription(SubscriptionCopyRequest request) {
 		try {
+			final Integer MAX_TARGET_COMPANIES = 10;
+			if (!CollectionUtils.isEmpty(request.getTargetCompanyIds())) {
+				if (request.getTargetCompanyIds().size() > MAX_TARGET_COMPANIES) {
+					throw new CustomException(ErrorCode.INVALID_REQUEST, String
+							.format(ErrorMessages.SUBSCRIPTION_COPY_MAX_TARGET_LIMIT_EXCEEDED, MAX_TARGET_COMPANIES));
+				}
+			} else {
+				throw new CustomException(ErrorCode.INVALID_REQUEST,
+						ErrorMessages.SUBSCRIPTION_COPY_MIN_TARGET_REQUIRED);
+			}
+			Boolean isSent = domainSyncService.sendCopyCustomerSubscriptionToDomains(request);
+			if (isSent == null || !isSent) {
+				throw new CustomException(ErrorCode.EXTERNAL_SERVICE_UNAVAILABLE,
+						ErrorMessages.SUBSCRIPTION_FEATURES_COPY_FAILURE);
+			}
+			request.getTargetCompanyIds().remove(request.getSourceCompanyId());
+			mapRepository.deleteByCompanyIdIn(request.getTargetCompanyIds());
 			Integer subscriptionType = masterRepository.getSubscriptionTypeByCompanyCode(request.getSourceCompanyId());
 			Integer noOfRowsAffected = masterRepository.copyCustomerSubscription(request.getSourceCompanyId(),
 					request.getTargetCompanyIds(), subscriptionType);
 			String plural = noOfRowsAffected == 1 ? "" : "s";
-			bulkUpsertFeatures(request.getSourceCompanyId(), request.getTargetCompanyIds(), 0);
+			bulkUpsertFeatures(request.getSourceCompanyId(), request.getTargetCompanyIds(), 1);
 
 			return String.format(SuccessMessages.SUBSCRIPTION_FEATURES_COPY_SUCCESSFUL, noOfRowsAffected, plural);
+		} catch (CustomException ce) {
+			throw ce;
 		} catch (Exception e) {
 			throw new CustomException(ErrorCode.DATABASE_CONNECTION_ERROR,
 					ErrorMessages.SUBSCRIPTION_FEATURES_COPY_FAILURE, e);
@@ -233,7 +275,9 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 	public List<CompanyDTO> getCompanyList(CompanyRequestDTO request) {
 		Integer page = request.getCount() != null ? request.getCount() : 0;
 		Integer size = 10;
-		Pageable pageable = Pageable.ofSize(size).withPage(page);
+
+		Sort sort = Sort.by(Sort.Direction.ASC, "companyName");
+		Pageable pageable = PageRequest.of(page, size, sort);
 
 		Specification<MasterCompany> filterSpec = (root, query, cb) -> cb.or(cb.isNull(root.get("parentId")),
 				cb.equal(root.get("parentId"), 0));
@@ -250,5 +294,15 @@ public class CustomerSubscriptionServiceImpl extends BaseService<MasterCompany, 
 		List<MasterCompany> companies = masterRepository.findAll(filterSpec, pageable).getContent();
 		return companies.stream().map(company -> new CompanyDTO(company.getId(), company.getCompanyName()))
 				.collect(Collectors.toList());
+	}
+
+	private MasterConfigDTO validateSubscriptionType(Integer subscriptionTypeId) {
+		MasterConfigDTO subscriptionType = masterDataService.getConfigById(subscriptionTypeId);
+		if (subscriptionType == null || !"SUBSCRIPTION_TYPE".equals(subscriptionType.getConfigType())
+				|| (!"STANDARD".equals(subscriptionType.getKeyCode())
+						&& !"PREMIUM".equals(subscriptionType.getKeyCode()))) {
+			throw new CustomException(ErrorCode.INVALID_REQUEST, ErrorMessages.SUBSCRIPTION_TIER_INVALID);
+		}
+		return subscriptionType;
 	}
 }

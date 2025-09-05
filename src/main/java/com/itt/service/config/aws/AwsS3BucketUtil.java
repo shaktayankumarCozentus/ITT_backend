@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -64,19 +65,37 @@ public class AwsS3BucketUtil {
 		}
 	}
 
+	/*
+	 * public boolean fileExistsInS3(String bucketName, String key) { try {
+	 * HeadObjectRequest headObjectRequest =
+	 * HeadObjectRequest.builder().bucket(bucketName).key(key).build();
+	 * 
+	 * s3Client.headObject(headObjectRequest); // returns metadata if object exists
+	 * return true; } catch (S3Exception e) { if (e.statusCode() == 404) { return
+	 * false; // object not found } else { throw e; // rethrow other errors } } }
+	 */
+	
 	public boolean fileExistsInS3(String bucketName, String key) {
-		try {
-			HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(bucketName).key(key).build();
+	    try {
+	       InputStream s3Object = getS3Object(bucketName, key);
+	       return true;
+	    } catch (S3Exception e) {
+	       if (e.statusCode() == 404) {
+	          return false; // object not found
+	       } else {
+	          throw e; // rethrow other errors
+	       }
+	    }
+	}
 
-			s3Client.headObject(headObjectRequest); // returns metadata if object exists
-			return true;
-		} catch (S3Exception e) {
-			if (e.statusCode() == 404) {
-				return false; // object not found
-			} else {
-				throw e; // rethrow other errors
-			}
-		}
+	public InputStream getS3Object(String bucketName, String keyName) {
+	    try {
+	       GetObjectRequest objectRequest = GetObjectRequest.builder().key(keyName).bucket(bucketName).build();
+	       return s3Client.getObject(objectRequest, ResponseTransformer.toInputStream());
+	    } catch (Exception e) {
+	       log.error("Error downloading file from S3: {}", e.getMessage());
+	       throw e;
+	    }
 	}
 
 	/**

@@ -18,19 +18,19 @@ public class ReleaseManual {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "id")
-	public Integer id;
+	private Integer id;
 
 	@Column(name = "note_type")
-	public String noteType;
+	private String noteType;
 
-	@Column(name = "folder_name")
-	public String folderName;
+	@Column(name = "release_user_manual_name")
+	private String releaseUserManualName;
 
 	@Column(name = "file_name")
-	public String fileName;
+	private String fileName;
 
 	@Column(name = "file_size")
-	public Double fileSize;
+	private Double fileSize;
 
 	@Lob
 	@Column(name = "file_url")
@@ -41,23 +41,23 @@ public class ReleaseManual {
 	public String bucketName;
 
 	@Column(name = "date_of_release_note")
-	public Timestamp dateOfReleaseNote;
+	private Timestamp dateOfReleaseNote;
 
 	@Column(name = "is_latest")
-	public Integer isLatest;
+	private Integer isLatest;
 
 	@Column(name = "is_deleted")
-	public Integer isDeleted;
+	private Integer isDeleted;
 
 	@Column(name = "created_by_id")
-	public Integer createdById;
+	private Integer createdById;
 
 	@Column(name = "uploaded_on")
-	public Timestamp uploadedOn;
+	private Timestamp uploadedOn;
 
 	@Column(name = "updated_by_id")
-	public Integer updatedById;
+	private Integer updatedById;
 
 	@Column(name = "updated_on")
-	public Timestamp updatedOn;
+	private Timestamp updatedOn;
 }

@@ -7,7 +7,6 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -16,8 +15,9 @@ import java.util.UUID;
 public class Plan {
 
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY) // Use AUTO or SEQUENCE based on your DB
 	@Column(name = "id", nullable = false, unique = true)
-	private UUID id;
+	private Integer id;
 
 	@Column(name = "name", nullable = false, unique = true)
 	private String name;
@@ -37,7 +37,6 @@ public class Plan {
 
 	@PrePersist
 	void onCreate() {
-		this.id = UUID.randomUUID();
 		this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
 		this.updatedAt = LocalDateTime.now(ZoneOffset.UTC);
 	}
