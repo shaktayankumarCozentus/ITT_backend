@@ -1,6 +1,7 @@
 package com.itt.service.controller;
 
 
+import com.itt.service.dto.release_manual.ReleaseManualDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.itt.service.dto.ApiResponse;
 import com.itt.service.dto.DataTableRequest;
 import com.itt.service.dto.PaginationResponse;
-import com.itt.service.dto.release_manual.ReleaseManualNotesDTO;
 import com.itt.service.enums.ErrorCode;
 import com.itt.service.service.ReleaseManualNotesService;
 import com.itt.service.util.ResponseBuilder;
@@ -33,9 +33,9 @@ public class ReleaseManualController {
 	private final ReleaseManualNotesService releaseNotesService;
 	
 	@PostMapping(value = "/release-manual-notes", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<ApiResponse<PaginationResponse<ReleaseManualNotesDTO>>> getReleaseManualNotes(@RequestParam String docType, @RequestBody DataTableRequest request) {
+	public ResponseEntity<ApiResponse<PaginationResponse<ReleaseManualDTO>>> getReleaseManualNotes(@RequestParam String docType, @RequestBody DataTableRequest request) {
 
-	    PaginationResponse<ReleaseManualNotesDTO> releaseNotesResponseDTOs = releaseNotesService.getReleaseNotesResponse(docType, request);
+		PaginationResponse<ReleaseManualDTO> releaseNotesResponseDTOs = releaseNotesService.getReleaseNotesResponse(docType, request);
 
 	    // Return the dynamic response built with the PaginationResponse
 	    return ResponseBuilder.dynamicResponse(releaseNotesResponseDTOs);
@@ -45,18 +45,6 @@ public class ReleaseManualController {
 	@GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<ApiResponse<String>> getReleaseNotesById(@PathVariable("id") Integer docId) {
 	    log.info("Entering getReleaseNotesById for docId={}",docId);
-
-	    // retrieve userId from auth context if available, otherwise keep blank as before
-	    String userId = "";
-
-	    // service returns the presigned URL or an empty/null value if not found
-
-//	    String documentUrl = releaseNotesService.getReleaseNotesWithFileName(
-//	            userId,
-//	            releaseNotesRequest.getNoteType(),
-//	            releaseNotesRequest.getFileName()
-//	    );
-
 		String documentUrl = releaseNotesService.getReleaseNotesById(docId);
 
 	    // ResponseBuilder.dynamicResponse will return 204 if documentUrl is empty, else 200 with ApiResponse
@@ -65,14 +53,14 @@ public class ReleaseManualController {
 
 	@Operation(summary = "Document uploading", description = "API for uploading a PDF document")
 	@PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE , produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<ApiResponse<ReleaseManualNotesDTO>> releaseNotesUpload(
+	public ResponseEntity<ApiResponse<ReleaseManualDTO>> releaseNotesUpload(
 	        @RequestParam("file") MultipartFile file,
 	        @RequestParam String docType,
 	        @RequestParam String releaseUserManualName,
 	        @RequestParam String releaseDate) {
 
 		try {
-			ApiResponse<ReleaseManualNotesDTO> response =
+			ApiResponse<ReleaseManualDTO> response =
 					releaseNotesService.releaseNotesUpload(file, releaseUserManualName, docType, releaseDate);
 
 			return ResponseEntity.status(HttpStatus.OK).body(response);
@@ -86,12 +74,12 @@ public class ReleaseManualController {
 
 	@Operation(summary = "Document re-uploading", description = "API for re-uploading a PDF document based on ID")
 	@PutMapping(value = "/{id}/re-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<ApiResponse<ReleaseManualNotesDTO>> reUploadReleaseNotes(
+	public ResponseEntity<ApiResponse<ReleaseManualDTO>> reUploadReleaseNotes(
 			@PathVariable("id") Integer id,
 			@RequestParam("file") MultipartFile file) {
 
 		try {
-			ApiResponse<ReleaseManualNotesDTO> response =
+			ApiResponse<ReleaseManualDTO> response =
 					releaseNotesService.reUploadReleaseNotes(id, file);
 
 			return ResponseEntity.ok(response);

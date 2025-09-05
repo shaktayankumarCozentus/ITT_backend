@@ -2,24 +2,28 @@ package com.itt.service.service.impl;
 
 import com.itt.service.annotation.ReadOnlyDataSource;
 import com.itt.service.config.aws.AwsS3BucketUtil;
+import com.itt.service.config.search.ReleaseManualSearchConfig;
 import com.itt.service.constants.DocumentRelatedConstants;
 import com.itt.service.constants.ErrorMessages;
 import com.itt.service.constants.SuccessMessages;
 import com.itt.service.dto.ApiResponse;
 import com.itt.service.dto.DataTableRequest;
 import com.itt.service.dto.PaginationResponse;
-import com.itt.service.dto.release_manual.ReleaseManualNotesDTO;
+import com.itt.service.dto.release_manual.ReleaseManualDTO;
 import com.itt.service.entity.DocumentDetails;
 import com.itt.service.entity.ReleaseManual;
 import com.itt.service.enums.ErrorCode;
+import com.itt.service.fw.search.SearchableEntity;
+import com.itt.service.mapper.ReleaseManualMapper;
 import com.itt.service.repository.DocumentDetailsRepository;
 import com.itt.service.repository.ReleaseManualRepository;
+import com.itt.service.service.BaseService;
 import com.itt.service.service.ReleaseManualNotesService;
 import com.itt.service.validator.RequestValidator;
-import lombok.RequiredArgsConstructor;
+import com.itt.service.validator.SortFieldValidator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,53 +31,50 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-import java.sql.Timestamp;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
+public class ReleaseManualServiceImpl extends BaseService<ReleaseManual, Integer, ReleaseManualDTO> implements ReleaseManualNotesService {
 
     private final ReleaseManualRepository releaseManualRepository;
     private final AwsS3BucketUtil awsS3BucketUtil;
     private final DocumentDetailsRepository detailsRepository;
+    private final ReleaseManualMapper manualMapper;
+    private final ReleaseManualSearchConfig manualSearchConfig;
 
-    //	@Override
-//	public PaginationResponse<ReleaseManualNotesDTO> getReleaseNotesResponse(String userId, String docType) {
-//		
-//		log.info("enter into ReleaseNotesResponse");
-//		List<ReleaseManualNotesDTO> releaseNotesResponse = new ArrayList<>();
-//		
-//		try {
-//			//ReleaseNotesUserEntity releasenoteusers = releaseNotesUserRepository.findByUserEmail(userId);
-//			ReleaseManualNotesDTO responseDTO = new ReleaseManualNotesDTO();
-//			//responseDTO.setIsSuperUser(!ObjectUtils.isEmpty(releasenoteusers) ? 1 : 0);
-//
-//			//GetDocumentDetailsEntity docDetails = null;
-//			List<ReleaseManual> releasenotesresponse = releaseManualRepository.findLatestUpdateReleaseNotes();
-//			responseDTO.set(releasenotesresponse);
-//
-//			//docDetails = documentDetails.getDocumentDetails(docType);
-//			releaseNotesResponse.add(responseDTO);
-//		} catch (Exception e) {
-//			log.error("An error occurred while fetching release notes response: " + e.getMessage(), e);
-//		}
-//
-//		return releaseNotesResponse;
-//	}
+    public ReleaseManualServiceImpl(ReleaseManualRepository releaseManualRepository,
+                                    @Qualifier("releaseManualValidator") SortFieldValidator sortFieldValidator,
+                                    AwsS3BucketUtil awsS3BucketUtil, ReleaseManualMapper manualMapper,
+                                    DocumentDetailsRepository detailsRepository, ReleaseManualSearchConfig manualSearchConfig) {
+        super(releaseManualRepository, sortFieldValidator, manualMapper::toDto);
+        this.releaseManualRepository = releaseManualRepository;
+        this.awsS3BucketUtil = awsS3BucketUtil;
+        this.detailsRepository = detailsRepository;
+        this.manualMapper = manualMapper;
+        this.manualSearchConfig = manualSearchConfig;
+    }
+
+    @Override
+    protected SearchableEntity<ReleaseManual> getSearchableEntity() {
+        return manualSearchConfig;
+    }
 
     @Override
     @ReadOnlyDataSource("Get release notes based on document type")
     @Transactional(readOnly = true)
-    public PaginationResponse<ReleaseManualNotesDTO> getReleaseNotesResponse(String docType, DataTableRequest request) {
+    public PaginationResponse<ReleaseManualDTO> getReleaseNotesResponse(String docType, DataTableRequest request) {
         log.info("Entering ReleaseManualServiceImpl.getReleaseNotesResponse docType={}", docType);
-
+        List<DataTableRequest.Column> columns = new ArrayList<>(ObjectUtils.defaultIfNull(request.getColumns(), List.of()));
+        columns.add(new DataTableRequest.Column("noteType", "eq:" + docType, null));
+        columns.add(new DataTableRequest.Column("isLatest", "eq:1", null));
+        columns.add(new DataTableRequest.Column("isDeleted", "eq:0", null));
+        request.setColumns(columns);
 
         // Optionally, validate docType if needed (e.g., "USER MANUAL" or "RELEASE NOTE")
         if (!"USER_MANUAL".equalsIgnoreCase(docType) && !"RELEASE_NOTE".equalsIgnoreCase(docType)) {
@@ -83,44 +84,9 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         // Assuming userId is retrieved from the authenticated session/context
         String userId = "";  // Retrieve userId based on your authentication mechanism
 
-        // Call service method to fetch paginated data
-        // Convert DataTableRequest into Pageable for pagination and sorting
-        Pageable pageable = request.toPageable();
-
         // Fetch paginated release notes from the repository using the updated query method
-        Page<ReleaseManual> page = releaseManualRepository.findByDocTypeAndLatestUpdate(docType, pageable);
-
-        if (page.isEmpty()) {
-            return new PaginationResponse<>(
-                    page.getPageable().getPageNumber(),
-                    page.getSize(),
-                    page.getTotalElements(),
-                    page.getTotalPages(),
-                    page.isLast(),
-                    List.of()
-            );
-        }
-
-        List<ReleaseManualNotesDTO> content = page.getContent().stream()
-                .map(releaseManual -> ReleaseManualNotesDTO.builder()
-                        .id(releaseManual.getId())
-                        .noteType(releaseManual.getNoteType())
-                        .fileName(releaseManual.getFileName())
-                        .releaseUserManualName(releaseManual.getReleaseUserManualName())
-                        .dateOfReleaseNote(toLocalDateTimeOrNull(releaseManual.getDateOfReleaseNote()))
-                        .uploadedOn(toLocalDateTimeOrNull(releaseManual.getUploadedOn()))
-                        .updatedOn(toLocalDateTimeOrNull(releaseManual.getUpdatedOn()))
-                        .build())
-                .toList();
-
-        return new PaginationResponse<>(
-                page.getPageable().getPageNumber(),
-                page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),
-                page.isLast(),
-                content
-        );
+        PaginationResponse<ReleaseManualDTO> response = super.search(request);
+        return response;
     }
 
     private boolean checkIfExistsInS3(String fileName, DocumentDetails docDetails, String folderName) {
@@ -154,25 +120,26 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
                     .orElseThrow(() -> new NoSuchElementException("Document config not found for docType: " + releaseNotesResponse.getNoteType()));
 
             String bucketBase = docDetails.getBucketName();
-            String bucketPath = bucketBase + "/" + "release-documents";
-//            String bucketPath = "https://apps-itt-docs-bucket-dev.s3.us-east-1.amazonaws.com/release-documents";
+            String bucketPath = bucketBase + "/" + DocumentRelatedConstants.RELEASE_NOTES_PREFIX;
 
-            boolean existsInS3 = checkIfExistsInS3(releaseNotesResponse.getFileName(), docDetails, "release-documents");
-            if (existsInS3) {
-                Date expiration = Date.from(Instant.now().plus(Duration.ofHours(1))); // 1 hour
-                try (S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build()) {
-                    try {
+            // boolean existsInS3 = checkIfExistsInS3(releaseNotesResponse.getFileName(), docDetails, "release-documents");
+
+            Date expiration = Date.from(Instant.now().plus(Duration.ofHours(1))); // 1 hour
+            try (S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build()) {
+                try {
                         documentUrl = awsS3BucketUtil.getPresignedURL(
                                 s3Client,
                                 bucketPath,
-                                releaseNotesResponse.getFileName(),
+                                releaseNotesResponse.getReleaseUserManualName(),
                                 expiration
                         );
-                    } catch (Exception ex) {
-                        throw new IllegalStateException("Failed to generate presigned URL", ex); // Replace with your custom exception
-                    }
+
+                    log.debug("documentUrl is : {}",documentUrl);
+                } catch (Exception ex) {
+                    throw new IllegalStateException("Failed to generate presigned URL", ex); // Replace with your custom exception
                 }
             }
+
         }
         return documentUrl;
     }
@@ -230,7 +197,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
     }
 
     @Override
-    public ApiResponse<ReleaseManualNotesDTO> releaseNotesUpload(
+    public ApiResponse<ReleaseManualDTO> releaseNotesUpload(
             MultipartFile file, String releaseUserManualName, String docType, String releaseDate) {
 
         log.info("Uploading release notes: release name={}, docType={}", releaseUserManualName, docType);
@@ -244,18 +211,13 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         ));
 
         if (validationError != null) {
-            return (ApiResponse<ReleaseManualNotesDTO>) validationError;
+            return (ApiResponse<ReleaseManualDTO>) validationError;
         }
 
         // 2. Parse release date (moved from controller)
-        Date parsedDate;
-        try {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-            parsedDate = dateFormat.parse(releaseDate);
-        } catch (ParseException e) {
-            return ApiResponse.error(ErrorCode.INVALID_DATE_FORMAT, "Invalid release date format. Expected yyyy-MM-dd.");
-        }
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDateTime parsedDate = LocalDate.parse(releaseDate, formatter)
+                .atStartOfDay();
 
         // 3. Validate file format
         if (!isValidFileForPdf(file)) {
@@ -289,11 +251,11 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         releaseManualRepository.save(releaseManual);
 
         // 7. Return response
-        return ApiResponse.success(SuccessMessages.FILE_UPLOADED, new ReleaseManualNotesDTO(releaseManual));
+        return ApiResponse.success(SuccessMessages.FILE_UPLOADED, manualMapper.toDto(releaseManual));
     }
 
     private ReleaseManual buildReleaseManual(MultipartFile file, String releaseUserManualName,
-                                             Date releaseDate, DocumentDetails docDetails,
+                                             LocalDateTime releaseDate, DocumentDetails docDetails,
                                              String fileUrl) {
 
         Instant now = Instant.now();
@@ -306,9 +268,9 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         releaseManual.setFileUrl(fileUrl);
         releaseManual.setIsDeleted(0);
         releaseManual.setIsLatest(1);
-        releaseManual.setUploadedOn(Timestamp.from(now));
-        releaseManual.setUpdatedOn(Timestamp.from(now));
-        releaseManual.setDateOfReleaseNote(new Timestamp(releaseDate.getTime()));
+        releaseManual.setUploadedOn(LocalDateTime.from(now));
+        releaseManual.setUpdatedOn(LocalDateTime.from(now));
+        releaseManual.setDateOfReleaseNote(releaseDate);
         // TODO: userId from security context
         releaseManual.setUpdatedById(1);
 
@@ -316,7 +278,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
     }
 
     @Override
-    public ApiResponse<ReleaseManualNotesDTO> reUploadReleaseNotes(Integer id, MultipartFile file) {
+    public ApiResponse<ReleaseManualDTO> reUploadReleaseNotes(Integer id, MultipartFile file) {
         log.info("Re-uploading release notes for id={}", id);
 
         // 1. Validate required fields
@@ -325,7 +287,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
                 "id", id
         ));
         if (validationError != null) {
-            return (ApiResponse<ReleaseManualNotesDTO>) validationError;
+            return (ApiResponse<ReleaseManualDTO>) validationError;
         }
 
         // 2. Validate file format
@@ -336,7 +298,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         }
 
         // 3. Fetch existing release manual
-        ReleaseManual existing = releaseManualRepository.findByIdAndIsDeleted(id,0)
+        ReleaseManual existing = releaseManualRepository.findByIdAndIsDeleted(id, 0)
                 .filter(releaseManual -> releaseManual.getNoteType().equalsIgnoreCase("RELEASE_NOTE"))
                 .orElse(null);
 
@@ -358,7 +320,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
             awsS3UploadedURL = awsS3BucketUtil.uploadPDFToS3Bucket(
                     docDetails.getBucketName(),
                     file,
-                    DocumentRelatedConstants.RELEASE_NOTES_PREFIX + "/release-documents");
+                    DocumentRelatedConstants.RELEASE_NOTES_PREFIX + existing.getReleaseUserManualName());
         } catch (Exception ex) {
             log.error("S3 Re-Upload failed : {}", ex);
             return ApiResponse.error(ErrorCode.FILE_UPLOAD_FAILED, ErrorMessages.FILE_UPLOAD_FAILED);
@@ -369,14 +331,14 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         existing.setFileName(file.getOriginalFilename());
         existing.setFileSize((double) file.getSize());
         existing.setFileUrl(awsS3UploadedURL);
-        existing.setUpdatedOn(Timestamp.from(now));
+        existing.setUpdatedOn(LocalDateTime.from(now));
         // TODO: replace with actual logged-in userId
         existing.setUpdatedById(1);
 
         releaseManualRepository.save(existing);
 
         // 7. Return response
-        return ApiResponse.success("File re-uploaded successfully", new ReleaseManualNotesDTO(existing));
+        return ApiResponse.success("File re-uploaded successfully", manualMapper.toDto(existing));
     }
 
 
@@ -401,7 +363,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         // 3. Mark as deleted (soft delete)
         Instant now = Instant.now();
         existing.setIsDeleted(1);
-        existing.setUpdatedOn(Timestamp.from(now));
+        existing.setUpdatedOn(LocalDateTime.from(now));
         // TODO: replace with actual logged-in userId
         existing.setUpdatedById(1);
 
@@ -434,18 +396,13 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
 
         // 3. Soft delete
         existing.setIsDeleted(1);
-        existing.setUpdatedOn(Timestamp.from(Instant.now()));
+        existing.setUpdatedOn(LocalDateTime.from(Instant.now()));
         // TODO: fetch actual logged-in user
         existing.setUpdatedById(1);
 
         releaseManualRepository.save(existing);
         log.debug("Release note deleted successfully for id= {} and docType= {}", id, docType);
         // 4. Response
-        return ApiResponse.success(String.format("%s deleted successfully",existing.getReleaseUserManualName()));
-    }
-
-
-    private static LocalDateTime toLocalDateTimeOrNull(Timestamp ts) {
-        return ts != null ? ts.toLocalDateTime() : null;
+        return ApiResponse.success(String.format("%s deleted successfully", existing.getReleaseUserManualName()));
     }
 }

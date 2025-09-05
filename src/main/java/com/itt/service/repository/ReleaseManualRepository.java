@@ -14,7 +14,7 @@ import java.util.Optional;
 
 
 @Repository
-public interface ReleaseManualRepository extends JpaRepository<ReleaseManual, Integer> {
+public interface ReleaseManualRepository extends BaseRepository<ReleaseManual, Integer> {
 	
 	@Query("SELECT r FROM ReleaseManual r WHERE r.noteType = :docType AND r.isLatest = 1 AND r.isDeleted = 0")
     Page<ReleaseManual> findByDocTypeAndLatestUpdate(@Param("docType") String docType, Pageable pageable);

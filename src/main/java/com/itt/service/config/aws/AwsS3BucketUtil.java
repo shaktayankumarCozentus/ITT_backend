@@ -17,10 +17,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
@@ -239,4 +236,26 @@ public class AwsS3BucketUtil {
 		log.info("AWSS3BucketUtil :: uploadPDFToS3Bucket :: File uploaded successfully.");
 		return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, Region.US_EAST_1.id(), fileName);
 	}
+
+	public String getURL(String bucketName, String keyName) throws Exception {
+		try {
+			GetUrlRequest request = GetUrlRequest.builder().bucket(bucketName).key(keyName).build();
+			return s3Client.utilities().getUrl(request).toString();
+		} catch (Exception e) {
+			log.error("Error getting S3 URL: {}", e.getMessage());
+			throw e;
+		}
+	}
+
+	public void putToS3Bucket(String bucketName, String keyName, byte[] file) {
+		try {
+			PutObjectRequest objectRequest = PutObjectRequest.builder().bucket(bucketName).key(keyName).build();
+			s3Client.putObject(objectRequest, RequestBody.fromBytes(file));
+			log.info("Successfully uploaded file: {} to bucket: {}", keyName, bucketName);
+		} catch (Exception e) {
+			log.error("Error uploading file to S3: {}", e.getMessage());
+			throw e;
+		}
+	}
+
 }

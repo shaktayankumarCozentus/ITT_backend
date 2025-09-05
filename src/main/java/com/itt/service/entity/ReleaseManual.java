@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -41,7 +42,7 @@ public class ReleaseManual {
 	public String bucketName;
 
 	@Column(name = "date_of_release_note")
-	private Timestamp dateOfReleaseNote;
+	private LocalDateTime dateOfReleaseNote;
 
 	@Column(name = "is_latest")
 	private Integer isLatest;
@@ -53,11 +54,11 @@ public class ReleaseManual {
 	private Integer createdById;
 
 	@Column(name = "uploaded_on")
-	private Timestamp uploadedOn;
+	private LocalDateTime uploadedOn;
 
 	@Column(name = "updated_by_id")
 	private Integer updatedById;
 
 	@Column(name = "updated_on")
-	private Timestamp updatedOn;
+	private LocalDateTime updatedOn;
 }
