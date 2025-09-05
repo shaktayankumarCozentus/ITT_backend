@@ -37,9 +37,6 @@ public class UserEventAuditConfig {
     @Column(name = "log_error", nullable = false)
     private boolean logError;
 
-    @Column(name = "only_on_error", nullable = false)
-    private boolean onlyOnError;
-
     @Column(name = "mask_fields", length = 512)
     private String maskFields; // comma separated
 

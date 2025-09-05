@@ -26,7 +26,7 @@ public class PlanService {
 	 * Updates the subscription plan for a user and deactivates their current plan
 	 * in the system. The rate-limit corresponding to the previous plan is cleared
 	 * on successful plan updation.
-	 * 
+	 *
 	 * If the provided plan-id to update matches the user's current plan-id, then no
 	 * changes in the datasource is performed and method execution is halted.
 	 *
@@ -41,7 +41,7 @@ public class PlanService {
 			throw new InvalidPlanException("No plan exists in the system with provided-id");
 		}
 
-		final var userId = authenticatedUserIdProvider.getUserId();
+		final var userId = authenticatedUserIdProvider.getCurrentUserId();
 		final var isExistingUserPlan = userPlanMappingRepository.isActivePlan(userId, planId);
 		if (Boolean.TRUE.equals(isExistingUserPlan)) {
 			return;

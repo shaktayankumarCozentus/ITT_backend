@@ -8,7 +8,6 @@ import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -20,18 +19,19 @@ public class UserPlanMapping {
 	@Id
 	@Setter(AccessLevel.NONE)
 	@Column(name = "id", nullable = false, unique = true)
-	private UUID id;
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Integer id;
 
 	@Column(name = "user_id", nullable = true)
-	private UUID userId;
+	private Integer userId;
 
 	@Setter(AccessLevel.NONE)
 	@ManyToOne(fetch = FetchType.EAGER, optional = false)
-	@JoinColumn(name = "user_id", nullable = true, insertable = false, updatable = false)
-	private User user;
+	@JoinColumn(name = "user_id", referencedColumnName = "id", insertable = false, updatable = false)
+	private MasterUser user;
 
 	@Column(name = "plan_id", nullable = true)
-	private UUID planId;
+	private Integer planId;
 
 	@Setter(AccessLevel.NONE)
 	@ManyToOne(fetch = FetchType.EAGER, optional = false)
@@ -51,7 +51,6 @@ public class UserPlanMapping {
 
 	@PrePersist
 	void onCreate() {
-		this.id = UUID.randomUUID();
 		this.isActive = Boolean.TRUE;
 		this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
 		this.updatedAt = LocalDateTime.now(ZoneOffset.UTC);

@@ -1,5 +1,10 @@
 package com.itt.service.dto.home;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.itt.service.enums.ModeOfTransport;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -21,4 +26,15 @@ public class KpiIndicatorDTO {
 	private Long airCount; // Count for Air mode
 	private Long railCount; // Count for Rail mode
 	private Long roadCount; // Count for Road mode
+
+	public TransportModeKpiDTO toModeCountList() {
+		List<ModeCountDTO> modeCountList = new ArrayList<>();
+
+		modeCountList.add(new ModeCountDTO(ModeOfTransport.OCEAN, this.oceanCount));
+		modeCountList.add(new ModeCountDTO(ModeOfTransport.AIR, this.airCount));
+		modeCountList.add(new ModeCountDTO(ModeOfTransport.RAIL, this.railCount));
+		modeCountList.add(new ModeCountDTO(ModeOfTransport.ROAD, this.roadCount));
+
+		return new TransportModeKpiDTO(this.totalCount, modeCountList);
+	}
 }

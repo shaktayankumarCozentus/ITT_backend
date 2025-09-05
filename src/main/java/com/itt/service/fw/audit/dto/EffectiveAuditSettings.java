@@ -12,6 +12,5 @@ public class EffectiveAuditSettings {
     private boolean logRequest;
     private boolean logResponse;
     private boolean logError;
-    private boolean onlyOnError;
     private Set<String> maskFields;
 }

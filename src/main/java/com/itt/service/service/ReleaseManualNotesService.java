@@ -15,6 +15,11 @@ public interface ReleaseManualNotesService {
 
 	String getReleaseNotesById(Integer docId);
 
-	ApiResponse<ReleaseManualNotesDTO> releaseNotesUpload(MultipartFile file, String folderName, String docType, String releaseDate);
+	ApiResponse<ReleaseManualNotesDTO> releaseNotesUpload(MultipartFile file, String releaseUserManualName, String docType, String releaseDate);
 
+	ApiResponse<ReleaseManualNotesDTO> reUploadReleaseNotes(Integer id, MultipartFile file);
+
+	ApiResponse<Void> deleteReleaseNoteById(Integer id);
+
+	ApiResponse<Void> deleteReleaseNoteByIdAndDocType(Integer id, String docType);
 }

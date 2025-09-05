@@ -15,6 +15,7 @@ class PortalUserServiceApplicationTests {
 	@Test
 	void applicationLoads() {
 		// Test that the main application class exists and can be instantiated
+		@SuppressWarnings("unused")
 		ServiceApplication application = new ServiceApplication();
 		// This test validates basic application structure without loading Spring context
 		// If you need integration testing with database, create separate integration test package

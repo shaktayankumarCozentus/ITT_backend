@@ -1,22 +1,5 @@
 package com.itt.service.service.impl;
 
-import java.sql.Timestamp;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.TimeZone;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.itt.service.annotation.ReadOnlyDataSource;
 import com.itt.service.config.aws.AwsS3BucketUtil;
 import com.itt.service.constants.DocumentRelatedConstants;
@@ -32,12 +15,25 @@ import com.itt.service.enums.ErrorCode;
 import com.itt.service.repository.DocumentDetailsRepository;
 import com.itt.service.repository.ReleaseManualRepository;
 import com.itt.service.service.ReleaseManualNotesService;
-
+import com.itt.service.validator.RequestValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -71,17 +67,17 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
 //
 //		return releaseNotesResponse;
 //	}
-	
-	@Override
-	@ReadOnlyDataSource("Get release notes based on document type")
+
+    @Override
+    @ReadOnlyDataSource("Get release notes based on document type")
     @Transactional(readOnly = true)
-	public PaginationResponse<ReleaseManualNotesDTO> getReleaseNotesResponse(String docType, DataTableRequest request) {
+    public PaginationResponse<ReleaseManualNotesDTO> getReleaseNotesResponse(String docType, DataTableRequest request) {
         log.info("Entering ReleaseManualServiceImpl.getReleaseNotesResponse docType={}", docType);
 
 
-        // Optionally, validate docType if needed (e.g., "USER MANUAL" or "RELEASE NOTES")
-        if (!"USER_MANUAL".equalsIgnoreCase(docType) && !"RELEASE_NOTES".equalsIgnoreCase(docType)) {
-            throw new IllegalArgumentException("Invalid docType. Allowed values are 'USER MANUAL' or 'RELEASE NOTES'");
+        // Optionally, validate docType if needed (e.g., "USER MANUAL" or "RELEASE NOTE")
+        if (!"USER_MANUAL".equalsIgnoreCase(docType) && !"RELEASE_NOTE".equalsIgnoreCase(docType)) {
+            throw new IllegalArgumentException("Invalid docType. Allowed values are 'USER_MANUAL' or 'RELEASE_NOTE'");
         }
 
         // Assuming userId is retrieved from the authenticated session/context
@@ -96,33 +92,34 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
 
         if (page.isEmpty()) {
             return new PaginationResponse<>(
+                    page.getPageable().getPageNumber(),
+                    page.getSize(),
+                    page.getTotalElements(),
+                    page.getTotalPages(),
+                    page.isLast(),
+                    List.of()
+            );
+        }
+
+        List<ReleaseManualNotesDTO> content = page.getContent().stream()
+                .map(releaseManual -> ReleaseManualNotesDTO.builder()
+                        .id(releaseManual.getId())
+                        .noteType(releaseManual.getNoteType())
+                        .fileName(releaseManual.getFileName())
+                        .releaseUserManualName(releaseManual.getReleaseUserManualName())
+                        .dateOfReleaseNote(toLocalDateTimeOrNull(releaseManual.getDateOfReleaseNote()))
+                        .uploadedOn(toLocalDateTimeOrNull(releaseManual.getUploadedOn()))
+                        .updatedOn(toLocalDateTimeOrNull(releaseManual.getUpdatedOn()))
+                        .build())
+                .toList();
+
+        return new PaginationResponse<>(
                 page.getPageable().getPageNumber(),
                 page.getSize(),
                 page.getTotalElements(),
                 page.getTotalPages(),
                 page.isLast(),
-                List.of()
-            );
-        }
-
-        List<ReleaseManualNotesDTO> content = page.getContent().stream()
-            .map(releaseManual -> ReleaseManualNotesDTO.builder()
-                    .id(releaseManual.getId())
-                    .noteType(releaseManual.getNoteType())
-                    .fileName(releaseManual.getFileName())
-                    .dateOfReleaseNote(toLocalDateTimeOrNull(releaseManual.getDateOfReleaseNote()))
-                    .uploadedOn(toLocalDateTimeOrNull(releaseManual.getUploadedOn()))
-                    .updatedOn(toLocalDateTimeOrNull(releaseManual.getUpdatedOn()))
-                    .build())
-            .toList();
-
-        return new PaginationResponse<>(
-            page.getPageable().getPageNumber(),
-            page.getSize(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.isLast(),
-            content
+                content
         );
     }
 
@@ -166,10 +163,10 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
                 try (S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build()) {
                     try {
                         documentUrl = awsS3BucketUtil.getPresignedURL(
-                            s3Client,
-                            bucketPath,
-                            releaseNotesResponse.getFileName(),
-                            expiration
+                                s3Client,
+                                bucketPath,
+                                releaseNotesResponse.getFileName(),
+                                expiration
                         );
                     } catch (Exception ex) {
                         throw new IllegalStateException("Failed to generate presigned URL", ex); // Replace with your custom exception
@@ -183,28 +180,28 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
     @Override
     @ReadOnlyDataSource("Get presigned url from S3 based on file name")
     @Transactional(readOnly = true)
-    public String getReleaseNotesWithFileName(String userId, String docType, String foldername) {
-        log.info("Entering ReleaseManualServiceImpl.getReleaseNotesWithFileName userId={}, docType={}, foldername={}", userId, docType, foldername);
+    public String getReleaseNotesWithFileName(String userId, String docType, String releaseUserManualName) {
+        log.info("Entering ReleaseManualServiceImpl.getReleaseNotesWithFileName userId={}, docType={}, releaseUserManualName={}", userId, docType, releaseUserManualName);
 
         String documentUrl = "";
-        ReleaseManual releasenotesresponse = releaseManualRepository.findReleaseNotesWithFolderName(foldername);
+        ReleaseManual releasenotesresponse = releaseManualRepository.findReleaseNotesWithReleaseUserManualName(releaseUserManualName);
 
         if (releasenotesresponse != null) {
             var docDetails = detailsRepository.getDocumentDetails(docType)//Sanskar need to clarify
                     .orElseThrow(() -> new NoSuchElementException("Document config not found for docType: " + docType));
             String bucketBase = docDetails.getBucketName();
-            String bucketPath = bucketBase + "/" + docDetails.getDocumentType() + "/" + foldername;
+            String bucketPath = bucketBase + "/" + docDetails.getDocumentType() + "/" + releaseUserManualName;
 
-            boolean existsInS3 = checkIfExistsInS3(releasenotesresponse.getFileName(), docDetails, foldername);
+            boolean existsInS3 = checkIfExistsInS3(releasenotesresponse.getFileName(), docDetails, releaseUserManualName);
             if (existsInS3) {
                 Date expiration = Date.from(Instant.now().plus(Duration.ofHours(1))); // 1 hour
                 try (S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build()) {
                     try {
                         documentUrl = awsS3BucketUtil.getPresignedURL(
-                            s3Client,
-                            bucketPath,
-                            releasenotesresponse.getFileName(),
-                            expiration
+                                s3Client,
+                                bucketPath,
+                                releasenotesresponse.getFileName(),
+                                expiration
                         );
                     } catch (Exception ex) {
                         throw new IllegalStateException("Failed to generate presigned URL", ex); // Replace with your custom exception
@@ -234,26 +231,20 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
 
     @Override
     public ApiResponse<ReleaseManualNotesDTO> releaseNotesUpload(
-            MultipartFile file, String folderName, String docType, String releaseDate) {
+            MultipartFile file, String releaseUserManualName, String docType, String releaseDate) {
 
-        log.info("Uploading release notes: folder={}, docType={}", folderName, docType);
+        log.info("Uploading release notes: release name={}, docType={}", releaseUserManualName, docType);
 
         // 1. Validate inputs
-        if (file == null || file.isEmpty()) {
-            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
-                    ErrorMessages.MISSING_REQUIRED_FIELD.formatted("file"));
-        }
-        if (folderName == null || folderName.isBlank()) {
-            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
-                    ErrorMessages.MISSING_REQUIRED_FIELD.formatted("folderName"));
-        }
-        if (docType == null || docType.isBlank()) {
-            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
-                    ErrorMessages.MISSING_REQUIRED_FIELD.formatted("docType"));
-        }
-        if (releaseDate == null || releaseDate.isBlank()) {
-            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
-                    ErrorMessages.MISSING_REQUIRED_FIELD.formatted("releaseDate"));
+        ApiResponse<?> validationError = RequestValidator.validateRequiredFields(Map.of(
+                "file", file,
+                "releaseUserManualName", releaseUserManualName,
+                "docType", docType,
+                "releaseDate", releaseDate
+        ));
+
+        if (validationError != null) {
+            return (ApiResponse<ReleaseManualNotesDTO>) validationError;
         }
 
         // 2. Parse release date (moved from controller)
@@ -286,14 +277,14 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
             awsS3UploadedURL = awsS3BucketUtil.uploadPDFToS3Bucket(
                     docDetails.getBucketName(),
                     file,
-                    DocumentRelatedConstants.RELEASE_NOTES_PREFIX + "/" + folderName);
+                    DocumentRelatedConstants.RELEASE_NOTES_PREFIX + "/" + releaseUserManualName);
         } catch (Exception ex) {
             log.error("S3 Upload failed : {}", ex);
             return ApiResponse.error(ErrorCode.FILE_UPLOAD_FAILED, ErrorMessages.FILE_UPLOAD_FAILED);
         }
 
         // 6. Persist entity
-        ReleaseManual releaseManual = buildReleaseManual(file, folderName, parsedDate, docDetails, awsS3UploadedURL);
+        ReleaseManual releaseManual = buildReleaseManual(file, releaseUserManualName, parsedDate, docDetails, awsS3UploadedURL);
 
         releaseManualRepository.save(releaseManual);
 
@@ -301,7 +292,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         return ApiResponse.success(SuccessMessages.FILE_UPLOADED, new ReleaseManualNotesDTO(releaseManual));
     }
 
-    private ReleaseManual buildReleaseManual(MultipartFile file, String folderName,
+    private ReleaseManual buildReleaseManual(MultipartFile file, String releaseUserManualName,
                                              Date releaseDate, DocumentDetails docDetails,
                                              String fileUrl) {
 
@@ -310,7 +301,7 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
 
         releaseManual.setFileName(file.getOriginalFilename());
         releaseManual.setFileSize((double) file.getSize());
-        releaseManual.setFolderName(folderName);
+        releaseManual.setReleaseUserManualName(releaseUserManualName);
         releaseManual.setBucketName(docDetails.getBucketName());
         releaseManual.setFileUrl(fileUrl);
         releaseManual.setIsDeleted(0);
@@ -322,6 +313,135 @@ public class ReleaseManualServiceImpl implements ReleaseManualNotesService {
         releaseManual.setUpdatedById(1);
 
         return releaseManual;
+    }
+
+    @Override
+    public ApiResponse<ReleaseManualNotesDTO> reUploadReleaseNotes(Integer id, MultipartFile file) {
+        log.info("Re-uploading release notes for id={}", id);
+
+        // 1. Validate required fields
+        ApiResponse<?> validationError = RequestValidator.validateRequiredFields(Map.of(
+                "file", file,
+                "id", id
+        ));
+        if (validationError != null) {
+            return (ApiResponse<ReleaseManualNotesDTO>) validationError;
+        }
+
+        // 2. Validate file format
+        if (!isValidFileForPdf(file)) {
+            String supported = String.join(", ", DocumentRelatedConstants.PERMITED_FILE_TYPES_PDF);
+            String message = ErrorMessages.INVALID_FILE_FORMAT + " Supported formats: " + supported;
+            return ApiResponse.error(ErrorCode.INVALID_FILE_FORMAT, message);
+        }
+
+        // 3. Fetch existing release manual
+        ReleaseManual existing = releaseManualRepository.findByIdAndIsDeleted(id,0)
+                .filter(releaseManual -> releaseManual.getNoteType().equalsIgnoreCase("RELEASE_NOTE"))
+                .orElse(null);
+
+        if (existing == null) {
+            return ApiResponse.error(ErrorCode.ENTITY_NOT_FOUND,
+                    "No document found");
+        }
+
+        // 4. Fetch document details using noteType
+        DocumentDetails docDetails = detailsRepository.getDocumentDetails(existing.getNoteType())
+                .orElse(null);
+        if (docDetails == null) {
+            return ApiResponse.error(ErrorCode.ENTITY_NOT_FOUND, ErrorMessages.ENTITY_NOT_FOUND);
+        }
+
+        // 5. Upload new file to S3
+        String awsS3UploadedURL;
+        try {
+            awsS3UploadedURL = awsS3BucketUtil.uploadPDFToS3Bucket(
+                    docDetails.getBucketName(),
+                    file,
+                    DocumentRelatedConstants.RELEASE_NOTES_PREFIX + "/release-documents");
+        } catch (Exception ex) {
+            log.error("S3 Re-Upload failed : {}", ex);
+            return ApiResponse.error(ErrorCode.FILE_UPLOAD_FAILED, ErrorMessages.FILE_UPLOAD_FAILED);
+        }
+
+        // 6. Update existing entity
+        Instant now = Instant.now();
+        existing.setFileName(file.getOriginalFilename());
+        existing.setFileSize((double) file.getSize());
+        existing.setFileUrl(awsS3UploadedURL);
+        existing.setUpdatedOn(Timestamp.from(now));
+        // TODO: replace with actual logged-in userId
+        existing.setUpdatedById(1);
+
+        releaseManualRepository.save(existing);
+
+        // 7. Return response
+        return ApiResponse.success("File re-uploaded successfully", new ReleaseManualNotesDTO(existing));
+    }
+
+
+    @Override
+    public ApiResponse<Void> deleteReleaseNoteById(Integer id) {
+        log.info("Deleting release note for id={}", id);
+
+        // 1. Validate input
+        if (id == null) {
+            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
+                    ErrorMessages.MISSING_REQUIRED_FIELD.formatted("id"));
+        }
+
+        // 2. Fetch existing release manual
+        ReleaseManual existing = releaseManualRepository.findById(id)
+                .orElse(null);
+        if (existing == null) {
+            return ApiResponse.error(ErrorCode.ENTITY_NOT_FOUND,
+                    "No such document available.");
+        }
+
+        // 3. Mark as deleted (soft delete)
+        Instant now = Instant.now();
+        existing.setIsDeleted(1);
+        existing.setUpdatedOn(Timestamp.from(now));
+        // TODO: replace with actual logged-in userId
+        existing.setUpdatedById(1);
+
+        releaseManualRepository.save(existing);
+
+        // 4. Return response
+        return ApiResponse.success("Release note deleted successfully");
+    }
+
+    @Override
+    public ApiResponse<Void> deleteReleaseNoteByIdAndDocType(Integer id, String docType) {
+        log.info("Deleting release note for id={} and docType={}", id, docType);
+
+        // 1. Validate inputs
+        if (id == null || docType == null || docType.isBlank()) {
+            return ApiResponse.error(ErrorCode.MISSING_REQUIRED_FIELD,
+                    "id and docType are required");
+        }
+
+        // 2. Fetch release manual by id + docType
+        Optional<ReleaseManual> optionalReleaseManual =
+                releaseManualRepository.findByIdAndNoteTypeAndIsDeleted(id, docType, 0);
+
+        if (optionalReleaseManual.isEmpty()) {
+            return ApiResponse.error(ErrorCode.ENTITY_NOT_FOUND,
+                    "No document found");
+        }
+
+        ReleaseManual existing = optionalReleaseManual.get();
+
+        // 3. Soft delete
+        existing.setIsDeleted(1);
+        existing.setUpdatedOn(Timestamp.from(Instant.now()));
+        // TODO: fetch actual logged-in user
+        existing.setUpdatedById(1);
+
+        releaseManualRepository.save(existing);
+        log.debug("Release note deleted successfully for id= {} and docType= {}", id, docType);
+        // 4. Response
+        return ApiResponse.success(String.format("%s deleted successfully",existing.getReleaseUserManualName()));
     }
 
 

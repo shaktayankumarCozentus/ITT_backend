@@ -15,7 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RateLimitingService {
 
-	private final ProxyManager<UUID> proxyManager;
+	private final ProxyManager<Integer> proxyManager;
 	private final UserPlanMappingRepository userPlanMappingRepository;
 
 	/**
@@ -27,7 +27,7 @@ public class RateLimitingService {
 	 * @return The rate-limiting {@link Bucket} associated with the user.
 	 * @throws IllegalArgumentException if provided argument is <code>null</code>.
 	 */
-	public Bucket getBucket(@NonNull final UUID userId) {
+	public Bucket getBucket(final Integer userId) {
 		return proxyManager.builder().build(userId, () -> createBucketConfiguration(userId));
 	}
 
@@ -37,7 +37,7 @@ public class RateLimitingService {
 	 * @param userId unique identifier of the user.
 	 * @throws IllegalArgumentException if provided argument is <code>null</code>.
 	 */
-	public void reset(@NonNull final UUID userId) {
+	public void reset(@NonNull final Integer userId) {
 		proxyManager.removeProxy(userId);
 	}
 
@@ -49,7 +49,7 @@ public class RateLimitingService {
 	 * @return The bucket configuration for rate limiting based on the user's active plan.
 	 * @throws IllegalArgumentException if provided argument is <code>null</code>.
 	 */
-	private BucketConfiguration createBucketConfiguration(@NonNull final UUID userId) {
+	private BucketConfiguration createBucketConfiguration(@NonNull final Integer userId) {
 		final var userPlanMapping = userPlanMappingRepository.getActivePlan(userId);
 		final var requestsAllowed = userPlanMapping.getPlan().getRequestsAllowed();
 		var timeUnit = userPlanMapping.getPlan().getTimeUnit();

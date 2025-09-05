@@ -1,7 +1,5 @@
 package com.itt.service.fw.ratelimit.configuration;
 
-import com.itt.service.fw.ratelimit.filter.JwtAuthenticationFilter;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

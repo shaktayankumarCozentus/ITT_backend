@@ -38,7 +38,8 @@ public class MasterDataServiceImpl implements MasterDataService {
 	public List<MasterConfigDTO> getConfigByKey(String keyCode) {
 		return masterConfigRepository.findByKeyCode(keyCode).stream()
 				.map(config -> new MasterConfigDTO(config.getId(), config.getConfigType(), config.getKeyCode(),
-						config.getName(), config.getDescription(), config.getIntValue(), config.getStringValue()))
+						config.getName(),
+						config.getDescription(), config.getIntValue(), config.getStringValue()))
 				.toList();
 	}
 
@@ -50,4 +51,10 @@ public class MasterDataServiceImpl implements MasterDataService {
 				.toList();
 	}
 
+	@Override
+	public MasterConfigDTO getConfigById(Integer id) {
+	    var config = masterConfigRepository.findById(id);
+	    return config.map(c -> new MasterConfigDTO(c.getId(), c.getConfigType(), c.getKeyCode(), 
+	        c.getName(), c.getDescription(), c.getIntValue(), c.getStringValue())).orElse(null);
+	}
 }

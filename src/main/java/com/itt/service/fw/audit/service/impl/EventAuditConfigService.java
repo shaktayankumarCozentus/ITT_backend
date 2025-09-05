@@ -69,7 +69,6 @@ public class EventAuditConfigService {
                 .logRequest(c.isLogRequest())
                 .logResponse(c.isLogResponse())
                 .logError(c.isLogError())
-                .onlyOnError(c.isOnlyOnError())
                 .maskFields(masks)
                 .build();
     }

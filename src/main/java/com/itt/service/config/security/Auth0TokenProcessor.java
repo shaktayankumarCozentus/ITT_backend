@@ -136,7 +136,7 @@ public class Auth0TokenProcessor  {
     private static final String CLAIM_EMAIL = "email";
     
     // Standard attribute name for user context
-    private static final String CURRENT_USER_ATTRIBUTE = "currentUser";
+    public static final String CURRENT_USER_ATTRIBUTE = "currentUser";
     private static final String ROLE_PREFIX = "ROLE_";
     private static final String BEARER_PREFIX = "Bearer ";
 

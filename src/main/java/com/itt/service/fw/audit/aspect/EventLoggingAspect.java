@@ -69,7 +69,6 @@ public class EventLoggingAspect {
                     .logRequest(ann.logRequest())
                     .logResponse(ann.logResponse())
                     .logError(ann.logError())
-                    .onlyOnError(ann.onlyOnError())
                     .maskFields(Set.of(ann.maskFields()))
                     .build();
         });
@@ -96,8 +95,8 @@ public class EventLoggingAspect {
         } finally {
             long duration = java.time.Duration.between(start, Instant.now()).toMillis();
 
-            boolean shouldLog = !cfg.isOnlyOnError() || error != null;
-            if (shouldLog && (error == null || cfg.isLogError())) {
+            boolean shouldLog = (error == null || cfg.isLogError());
+            if (shouldLog) {
                 String traceId = TraceIdContextHolder.get();
                 if (traceId == null || traceId.isBlank()) {
                     traceId = UUID.randomUUID().toString();

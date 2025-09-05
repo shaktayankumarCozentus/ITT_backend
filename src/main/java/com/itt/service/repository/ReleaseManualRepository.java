@@ -19,6 +19,10 @@ public interface ReleaseManualRepository extends JpaRepository<ReleaseManual, In
 	@Query("SELECT r FROM ReleaseManual r WHERE r.noteType = :docType AND r.isLatest = 1 AND r.isDeleted = 0")
     Page<ReleaseManual> findByDocTypeAndLatestUpdate(@Param("docType") String docType, Pageable pageable);
 	
-	@Query("SELECT r FROM ReleaseManual r WHERE r.folderName = :folderName AND r.isDeleted = 0 AND r.isLatest = 1")
-	ReleaseManual findReleaseNotesWithFolderName(@Param("folderName") String folderName);
+	@Query("SELECT r FROM ReleaseManual r WHERE r.releaseUserManualName = :releaseUserManualName AND r.isDeleted = 0 AND r.isLatest = 1")
+	ReleaseManual findReleaseNotesWithReleaseUserManualName(@Param("releaseUserManualName") String releaseUserManualName);
+
+	Optional<ReleaseManual> findByIdAndNoteTypeAndIsDeleted(Integer id, String noteType, Integer isDeleted);
+
+	Optional<ReleaseManual> findByIdAndIsDeleted(Integer id, Integer isDeleted);
 }
