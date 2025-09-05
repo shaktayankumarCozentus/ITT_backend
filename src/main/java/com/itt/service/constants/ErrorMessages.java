@@ -44,12 +44,6 @@ public final class ErrorMessages {
 	public static final String BULK_SUBSCRIPTION_UPDATE_FAILURE = "Failed to update subscription for selected companies";
 	public static final String SUBSCRIPTION_UPDATE_FAILURE = "Failed to update customer subscription";
 	public static final String SUBSCRIPTION_FEATURES_COPY_FAILURE = "Failed to copy subscription features";
-	public static final String SUBSCRIPTION_TIER_INVALID = "Invalid Subscription Tier";
-	public static final String SUBSCRIPTION_FEATURES_INVALID = "Invalid Subscription Features";
-	public static final String STANDARD_SUBSCRIPTION_FEATURES_NOT_CONFIGURABLE = "Features cannot be configured for Standard subscription type";
-	public static final String PREMIUM_SUBSCRIPTION_REQUIRES_FEATURES = "Premium subscription requires at least one feature to be selected";
-	public static final String SUBSCRIPTION_COPY_MAX_TARGET_LIMIT_EXCEEDED = "Cannot copy subscription to more than %d companies at once";
-	public static final String SUBSCRIPTION_COPY_MIN_TARGET_REQUIRED = "At least one target company must be specified for copying subscription";
 
 	// ==================== PETA/PETD MESSAGES ====================
 	public static final String BULK_PETA_PETD_UPDATE_FAILURE = "Failed to update PETA/PETD for selected companies";

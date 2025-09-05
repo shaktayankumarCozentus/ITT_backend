@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.itt.service.dto.ApiResponse;
 import com.itt.service.dto.CurrentUserDto;
 import com.itt.service.dto.PaginationResponse;
+import com.itt.service.dto.home.KpiIndicatorDTO;
 import com.itt.service.dto.home.KpiIndicatorRequestDTO;
 import com.itt.service.dto.home.LocationStatsSummaryDTO;
 import com.itt.service.dto.home.MapViewRequestDTO;
 import com.itt.service.dto.home.PortShipmentsInfoRequestDTO;
 import com.itt.service.dto.home.ShipmentSummaryDTO;
-import com.itt.service.dto.home.TransportModeKpiDTO;
 import com.itt.service.service.HomeService;
 import com.itt.service.util.ResponseBuilder;
 
@@ -34,9 +34,9 @@ public class HomeController {
 
 	@PostMapping("/kpi")
 	@PreAuthorize("hasRole('ROLE_HOME_PAGE_VIEW')")
-	public ResponseEntity<ApiResponse<TransportModeKpiDTO>> getKpiIndicator(@RequestBody KpiIndicatorRequestDTO request,
+	public ResponseEntity<ApiResponse<KpiIndicatorDTO>> getKpiIndicator(@RequestBody KpiIndicatorRequestDTO request,
 			@RequestAttribute(required = true) CurrentUserDto currentUser) {
-		TransportModeKpiDTO response = homeService.getKpiIndicator(request, currentUser).toModeCountList();
+		KpiIndicatorDTO response = homeService.getKpiIndicator(request, currentUser);
 		return ResponseBuilder.success(response);
 	}
 

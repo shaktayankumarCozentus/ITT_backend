@@ -25,14 +25,14 @@ public class CustomerSubscriptionSearchConfig implements SearchableEntity<Master
 	public Set<String> getSearchableFields() {
 		return Set.of(
 				"id", "companyName", "subscriptionTypeConfig.name", "onboardedBySource.name",
-				"createdOn", "updatedOn", "updatedBy.email", "subscriptionTypeConfigId");
+				"createdOn", "updatedOn", "updatedBy.email");
 	}
 
 	@Override
 	public Set<String> getSortableFields() {
 		return Set.of(
 				"id", "companyName", "subscriptionTypeConfig.name", "onboardedBySource.name",
-				"createdOn", "updatedOn", "updatedBy.email", "subscriptionTypeConfigId");
+				"createdOn", "updatedOn", "updatedBy.email");
 	}
 
 	@Override
@@ -70,8 +70,6 @@ public class CustomerSubscriptionSearchConfig implements SearchableEntity<Master
 				"subscriptionTypeName", "subscriptionTypeConfig.name",
 				"onboardedSourceName", "onboardedBySource.name",
 				"onboardedOn", "createdOn",
-				"updatedBy", "updatedBy.email",
-				"subscriptionTypeConfigId", "subscriptionTypeConfigId"
-				);
+				"updatedBy", "updatedBy.email");
 	}
 }

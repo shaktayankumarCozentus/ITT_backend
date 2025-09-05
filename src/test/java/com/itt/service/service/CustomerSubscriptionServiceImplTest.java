@@ -25,7 +25,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -46,6 +45,8 @@ import com.itt.service.exception.CustomException;
 import com.itt.service.mapper.CustomerSubscriptionMapper;
 import com.itt.service.repository.MapCompanySubscriptionRepository;
 import com.itt.service.repository.MasterCompanyRepository;
+import com.itt.service.service.CustomerSubscriptonDomainSyncService;
+import com.itt.service.service.MasterDataService;
 import com.itt.service.service.impl.CustomerSubscriptionServiceImpl;
 import com.itt.service.validator.SortFieldValidator;
 import jakarta.persistence.EntityManager;
@@ -468,7 +469,7 @@ class CustomerSubscriptionServiceImplTest {
 		
 		Page<MasterCompany> mockPage = new PageImpl<>(Arrays.asList(company1, company2));
 		
-		when(companyRepo.findAll(ArgumentMatchers.<Specification<MasterCompany>>any(), any(Pageable.class))).thenReturn(mockPage);
+		when(companyRepo.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
 		
 		List<CompanyDTO> result = service.getCompanyList(request);
 		
@@ -477,7 +478,7 @@ class CustomerSubscriptionServiceImplTest {
 		assertThat(result.get(0).getCompanyName()).isEqualTo("Test Company 1");
 		assertThat(result.get(1).getCompanyCode()).isEqualTo(102);
 		assertThat(result.get(1).getCompanyName()).isEqualTo("Test Company 2");
-		verify(companyRepo).findAll(ArgumentMatchers.<Specification<MasterCompany>>any(), any(Pageable.class));
+		verify(companyRepo).findAll(any(Specification.class), any(Pageable.class));
 	}
 	
 	@Test
@@ -495,13 +496,13 @@ class CustomerSubscriptionServiceImplTest {
 		
 		Page<MasterCompany> mockPage = new PageImpl<>(List.of(company));
 		
-		when(companyRepo.findAll(ArgumentMatchers.<Specification<MasterCompany>>any(), any(Pageable.class))).thenReturn(mockPage);
+		when(companyRepo.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
 		
 		List<CompanyDTO> result = service.getCompanyList(request);
 		
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getCompanyName()).contains("Test");
-		verify(companyRepo).findAll(ArgumentMatchers.<Specification<MasterCompany>>any(), any(Pageable.class));
+		verify(companyRepo).findAll(any(Specification.class), any(Pageable.class));
 	}
 	
 	@Test

@@ -8,14 +8,16 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Getter
 @Setter
 @JsonNaming(value = PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 @Schema(title = "PlanUpdationRequest", accessMode = Schema.AccessMode.WRITE_ONLY)
 public class UserPlanUpdationRequestDto {
 
-	@Schema(requiredMode = RequiredMode.REQUIRED, description = "plan to be attached with user record")
 	@NotNull
-	private Integer planId;
+	@Schema(requiredMode = RequiredMode.REQUIRED, description = "plan to be attached with user record")
+	private UUID planId;
 
 }

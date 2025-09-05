@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
 
+import java.util.UUID;
+
 @Getter
 @Builder
 @Jacksonized
@@ -16,7 +18,7 @@ import lombok.extern.jackson.Jacksonized;
 public class PlanResponseDto {
 
 	@Schema(description = "Unique identifier of the plan", example = "a38e2b9a-ff7f-42a0-8b1c-4ff6d2b9a0cc")
-	private Integer id;
+	private UUID id;
 
 	@Schema(description = "Name of the plan", example = "PROFESSIONAL")
 	private String name;

@@ -43,10 +43,4 @@ public class CacheConfiguration {
         Cache<String, byte[]> cache = cacheManager.getCache(CACHE_NAME);
         return new JCacheProxyManager<>(cache);
     }
-
-    @Bean
-    public ProxyManager<Integer> integerProxyManager(CacheManager cacheManager) {
-        Cache<Integer, byte[]> cache = cacheManager.getCache(CACHE_NAME);
-        return new JCacheProxyManager<>(cache);
-    }
 }
